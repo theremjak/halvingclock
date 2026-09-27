@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The Halving Clock · Bitcoin halving countdown and cycle tracker</title>
+<meta name="description" content="{{DESC}}">
+<link rel="canonical" href="{{URL}}/">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta property="og:type" content="website">
+<meta property="og:title" content="The Halving Clock">
+<meta property="og:description" content="{{DESC}}">
+<meta property="og:url" content="{{URL}}/">
+<meta property="og:image" content="{{URL}}/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="The Halving Clock">
+<meta name="twitter:description" content="{{DESC}}">
+<meta name="twitter:image" content="{{URL}}/og.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
+{{ANALYTICS}}
+<style>
+:root {
+  --ground: #f2f4f7; --surface: #ffffff; --sunk: #eceff3; --ink: #14171c; --muted: #596170; --faint: #8b93a1;
+  --rule: #dce1e8; --grid: #e7ebf0;
+  --now: #d97706; --now-soft: #fdecd3;
+  --c1: #2a78d6; --c2: #1baf7a; --c3: #4a3aa7;
+  --peakband: rgba(42,120,214,.10); --lowband: rgba(194,54,43,.10);
+  --gain: #15803d; --loss: #c2362b; --focus: #2a78d6;
+  --sans: "Schibsted Grotesk", "Helvetica Neue", Arial, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #0d0f13; --surface: #15181e; --sunk: #1b1f26; --ink: #e9ecf1; --muted: #9ba3b1; --faint: #6c7483;
+    --rule: #272c35; --grid: #1f242c;
+    --now: #d97706; --now-soft: #3a2710;
+    --c1: #3987e5; --c2: #199e70; --c3: #9085e9;
+    --peakband: rgba(57,135,229,.14); --lowband: rgba(240,106,94,.13);
+    --gain: #3fb468; --loss: #f06a5e; --focus: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #0d0f13; --surface: #15181e; --sunk: #1b1f26; --ink: #e9ecf1; --muted: #9ba3b1; --faint: #6c7483;
+  --rule: #272c35; --grid: #1f242c;
+  --now: #d97706; --now-soft: #3a2710;
+  --c1: #3987e5; --c2: #199e70; --c3: #9085e9;
+  --peakband: rgba(57,135,229,.14); --lowband: rgba(240,106,94,.13);
+  --gain: #3fb468; --loss: #f06a5e; --focus: #3987e5;
+}
+* { box-sizing: border-box; }
+body { background: var(--ground); color: var(--ink); font: 15px/1.55 var(--sans); padding: 0 20px; }
+.wrap { max-width: 1160px; margin: 0 auto; padding-block: 30px 56px; display: flex; flex-direction: column; gap: 26px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+header { display: grid; gap: 12px; }
+.kicker { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+h1 { font: 800 clamp(30px, 5.2vw, 50px)/1.02 var(--sans); letter-spacing: -.025em; }
+.thesis { max-width: 66ch; font-size: 17px; color: var(--muted); }
+.thesis strong { color: var(--ink); }
+
+section.panel { background: var(--surface); border: 1px solid var(--rule); padding: 18px 20px; display: grid; gap: 12px; }
+.ph h2 { font: 700 18px/1.25 var(--sans); }
+.ph p { margin: 3px 0 0; color: var(--muted); font-size: 13.5px; max-width: 76ch; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend .ln { display: inline-block; width: 18px; border-top: 2.5px solid; margin-right: 6px; vertical-align: 4px; }
+.legend .bx { display: inline-block; width: 14px; height: 10px; margin-right: 6px; vertical-align: -1px; }
+
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--muted); font: 11.5px var(--mono); }
+.gl { stroke: var(--grid); stroke-width: 1; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule); padding: 8px 10px; min-width: 190px;
+  font: 12px/1.5 var(--mono); color: var(--ink); box-shadow: 0 6px 18px rgba(0,0,0,.14); z-index: 5; }
+.tip .d { color: var(--muted); margin-bottom: 2px; } .tip .r { display: flex; justify-content: space-between; gap: 14px; }
+.sw { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--rule); padding: 16px 18px; display: grid; gap: 8px; align-content: start; }
+.card .lab { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.card .when { font: 700 clamp(22px, 3.2vw, 28px)/1.15 var(--sans); }
+.card .how { font: 500 15px var(--mono); color: var(--now); }
+.card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13.5px; display: grid; gap: 4px; }
+.card ul b { color: var(--ink); font-weight: 600; }
+.status { display: inline-block; font: 600 11px var(--sans); padding: 3px 8px; border-radius: 999px; background: var(--now-soft); color: var(--now); width: max-content; }
+
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th { text-align: left; font: 600 10.5px/1.3 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--faint); padding: 8px 10px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+td { padding: 8px 10px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+td.r, th.r { text-align: right; }
+.sub { color: var(--muted); font-size: 12px; display: block; }
+.pos { color: var(--gain); } .neg { color: var(--loss); }
+.scroll { overflow-x: auto; }
+tr.cur td { background: var(--now-soft); }
+td.next { outline: 2px dashed var(--now); outline-offset: -3px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 520px), 1fr)); gap: 22px; }
+.inbar { height: 10px; background: var(--sunk); border-radius: 2px; min-width: 110px; position: relative; }
+.inbar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 2px; }
+.foot { font-size: 13px; color: var(--muted); max-width: 90ch; display: grid; gap: 6px; }
+.foot b { color: var(--ink); }
+@media (max-width: 560px) { body { padding: 0 16px; } section.panel { padding: 14px; } }
+/* public-site additions */
+:root { color-scheme: light; }
+body { margin: 0; }
+.hero { display: grid; gap: 14px; }
+.count { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
+.cell { background: var(--surface); border: 1px solid var(--rule); padding: 12px 16px; min-width: 92px; display: grid; gap: 2px; }
+.cell b { font: 700 clamp(26px, 4.4vw, 40px)/1 var(--mono); font-variant-numeric: tabular-nums; }
+.cell span { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--faint); }
+.cell.blocks b { color: var(--now); }
+.live { font-size: 13px; color: var(--muted); }
+.live i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--gain); margin-right: 6px; vertical-align: 0; }
+.donate { background: var(--surface); border: 1px solid var(--rule); padding: 18px 20px; display: grid; gap: 10px; }
+.donate h2 { font: 700 18px var(--sans); }
+.donate .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.btn { font: 600 14px var(--sans); color: #fff; background: var(--now); border: 0; padding: 9px 14px; border-radius: 6px; text-decoration: none; cursor: pointer; }
+.btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
+.ln { font: 500 13px var(--mono); color: var(--muted); word-break: break-all; }
+.site-foot { font-size: 13px; color: var(--muted); display: grid; gap: 6px; max-width: 90ch; }
+.site-foot a { color: var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="kicker" id="kicker"></div>
+    <h1>The Halving Clock</h1>
+    <p class="thesis" id="thesis"></p>
+    <div>
+      <div class="kicker" style="margin-bottom:8px" id="cd-label"></div>
+      <div class="count" aria-live="polite">
+        <div class="cell"><b id="cd-d">–</b><span>days</span></div>
+        <div class="cell"><b id="cd-h">–</b><span>hours</span></div>
+        <div class="cell"><b id="cd-m">–</b><span>minutes</span></div>
+        <div class="cell"><b id="cd-s">–</b><span>seconds</span></div>
+        <div class="cell blocks"><b id="cd-b">–</b><span>blocks to go</span></div>
+      </div>
+      <p class="live" id="cd-live"></p>
+    </div>
+  </header>
+
+  <section class="panel" aria-labelledby="clk-h">
+    <div class="ph"><h2 id="clk-h">Where this cycle stands</h2>
+      <p id="clk-sub"></p></div>
+    <div class="legend"><span><span class="bx" style="background:var(--peakband);border:1px solid var(--c1)"></span><span id="lg-pk">Past peaks</span></span>
+      <span><span class="bx" style="background:var(--lowband);border:1px solid var(--loss)"></span><span id="lg-lw">Past lows</span></span>
+      <span><span class="dot" style="background:var(--now)"></span>This cycle</span></div>
+    <div class="chart" id="clock"></div>
+  </section>
+
+  <div class="cards" id="cards"></div>
+
+  <section class="panel" aria-labelledby="ov-h">
+    <div class="ph"><h2 id="ov-h">Every cycle, lined up at its halving</h2>
+      <p>Price as a multiple of the price on halving day, log scale. Dots mark each cycle's peak and low. The shrinking height of each peak is the diminishing return.</p></div>
+    <div class="legend" id="ov-legend"></div>
+    <div class="chart" id="overlay"></div>
+  </section>
+
+  <section class="panel" aria-labelledby="tb-h">
+    <div class="ph"><h2 id="tb-h">The cycles in numbers</h2><p>Peak = highest daily close within two years of the halving. Low = lowest close after that peak and before the next halving.</p></div>
+    <div class="scroll"><table id="cycles"></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="yr-h">
+    <div class="ph"><h2 id="yr-h">Returns by year of the cycle</h2><p id="yr-sub">Each cycle has run the same four calendar years: halving year, peak year, bear year, recovery year. Dashed cells are years still ahead.</p></div>
+    <div class="scroll"><table id="years"></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="df-h">
+    <div class="ph"><h2 id="df-h">Returns per unit of mining difficulty</h2>
+      <p>Difficulty is retargeted every 2,016 blocks to match the network's hash rate, so hash-rate growth is difficulty growth. Measured halving to halving (the current cycle to date).</p></div>
+    <div class="scroll"><table id="diff"></table></div>
+  </section>
+
+  <section class="panel" aria-labelledby="hp-h">
+    <div class="ph"><h2 id="hp-h">What a unit of hash rate earns</h2>
+      <p>Miner revenue (new coins plus fees) per petahash per second per day, 30-day average, log scale. Dashed lines are halvings.</p></div>
+    <div class="chart" id="hashprice"></div>
+  </section>
+
+  <section class="donate" id="donate" hidden>
+    <h2>Keep the clock running</h2>
+    <p class="live" style="margin:0">The Halving Clock is free, ad-free and rebuilt every day. If it's useful, you can buy it a coffee.</p>
+    <div class="row" id="donate-row"></div>
+  </section>
+
+  <footer class="site-foot">
+    <div><b>Data.</b> Block heights, exact halving times, hash rate, difficulty and miner rewards from <a href="https://mempool.space">mempool.space</a>;
+      daily BTC/USD closes from <a href="https://www.bitstamp.net">Bitstamp</a> (from Aug 2011; earlier weekly prices from mempool.space). The next halving
+      (block <span id="f-next"></span>) is projected at the pace since the last halving, about <span id="f-rate"></span> blocks a day, and the countdown
+      re-checks the live block height every minute. Page rebuilt {{BUILT}}.</div>
+    <div><b>Definitions.</b> Cycle peak = highest daily close within two years after a halving. Cycle low = lowest close after that peak and before the next halving.</div>
+    <div><b>Not financial advice.</b> Three complete cycles is a pattern, not a law, and this cycle already broke it once: a new high <i>before</i> the halving
+      (March 2024, after the US spot ETFs launched), a peak only about 2× the halving price, and a shallower fall so far. The projections show where the old rhythm would
+      put things, not a forecast.</div>
+  </footer>
+</div>
+
+<script id="data" type="application/json">/*DATA*/</script>
+<script>
+(() => {
+  const D = JSON.parse(document.getElementById("data").textContent);
+  const $ = (id) => document.getElementById(id);
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (t, a = {}, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; };
+  const day = 864e5, ts = (s) => new Date(s + "T12:00:00").getTime();
+  const dfmt = (s) => new Date(s + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  const mfmt = (s) => new Date(s + "T12:00:00").toLocaleDateString(undefined, { month: "short", year: "numeric" });
+  const usd = (v) => v >= 1e6 ? "$" + (v / 1e6).toFixed(2) + "M" : v >= 1000 ? "$" + Math.round(v).toLocaleString() : v >= 10 ? "$" + v.toFixed(0) : "$" + v.toFixed(2);
+  const pct = (v, d = 0) => (v > 0 ? "+" : "") + (v * 100).toLocaleString(undefined, { maximumFractionDigits: d }) + "%";
+  const mult = (v) => (v >= 10 ? v.toFixed(0) : v.toFixed(1)) + "×";
+  const C = D.cycles, P = D.proj, cur = C[C.length - 1], past = C.slice(0, -1);
+  const COL = ["var(--c1)", "var(--c2)", "var(--c3)", "var(--now)"];
+  const daysNow = Math.round((ts(D.asof) - ts(cur.halving)) / day);
+  const span = Math.round((ts(D.next_halving) - ts(cur.halving)) / day);
+  const pkLo = Math.min(...past.map((c) => c.peak_days)), pkHi = Math.max(...past.map((c) => c.peak_days));
+  const lwLo = Math.min(...past.map((c) => c.low_days)), lwHi = Math.max(...past.map((c) => c.low_days));
+
+  $("kicker").textContent = `Bitcoin halving cycles · updated ${dfmt(D.asof)}`;
+  $("thesis").innerHTML = `Today is <strong>day ${daysNow}</strong> of cycle ${cur.n}. The last three cycles peaked on days ${pkLo}–${pkHi} after their halving and bottomed on days ${lwLo}–${lwHi}. This cycle peaked on day ${cur.peak_days} (<strong>${usd(cur.peak)}</strong>, ${dfmt(cur.peak_date)}), right on schedule, and Bitcoin now sits <strong>${pct(D.cur_dd)}</strong> below it at ${usd(D.price)}.`;
+  $("f-rate").textContent = Math.round(D.blocks_per_day);
+  $("lg-pk").textContent = `Past peaks (days ${pkLo}–${pkHi})`;
+  $("lg-lw").textContent = `Past lows (days ${lwLo}–${lwHi})`;
+  $("f-next").textContent = D.next_height.toLocaleString();
+  $("clk-sub").textContent = `Days since the ${mfmt(cur.halving)} halving, against the windows where the ${past.length} earlier cycles put their peak and their low.`;
+  $("clk-h").textContent = `Where cycle ${cur.n} stands`;
+
+  // ── live countdown: re-check the tip height every minute (mempool.space allows cross-origin reads) ──
+  let tip = D.tip, tipTime = D.tip_time * 1000;
+  const eta = () => tipTime + (D.next_height - tip) * D.secs_per_block * 1000;
+  $("cd-label").textContent = `Countdown to halving ${C.length + 1} · block ${D.next_height.toLocaleString()} · ≈ ${dfmt(new Date(eta()).toISOString().slice(0, 10))}`;
+  const pad = (n) => String(n).padStart(2, "0");
+  const tick = () => {
+    let s = Math.max(0, Math.floor((eta() - Date.now()) / 1000));
+    $("cd-d").textContent = Math.floor(s / 86400).toLocaleString(); s %= 86400;
+    $("cd-h").textContent = pad(Math.floor(s / 3600)); s %= 3600;
+    $("cd-m").textContent = pad(Math.floor(s / 60)); $("cd-s").textContent = pad(s % 60);
+    $("cd-b").textContent = Math.max(0, D.next_height - tip).toLocaleString();
+  };
+  const poll = async () => {
+    try {
+      const r = await fetch("https://mempool.space/api/blocks/tip/height", { cache: "no-store" });
+      if (r.ok) { const h = parseInt(await r.text(), 10); if (h > tip) { tip = h; tipTime = Date.now(); }
+        $("cd-live").innerHTML = `<i></i>Live block height ${tip.toLocaleString()} · checked ${new Date().toLocaleTimeString()}`; }
+    } catch (e) { $("cd-live").textContent = `Block height ${tip.toLocaleString()} as of the daily build (live check unavailable)`; }
+  };
+  tick(); setInterval(tick, 1000); poll(); setInterval(poll, 60000);
+
+  // ── donations (shown only when configured in config.json) ──
+  const cfg = D.config || {};
+  const dr = [];
+  if (cfg.kofi) dr.push(`<a class="btn" href="https://ko-fi.com/${encodeURIComponent(cfg.kofi)}" target="_blank" rel="noopener">☕ Buy me a coffee</a>`);
+  if (cfg.lightning) dr.push(`<button class="btn ghost" type="button" id="ln-copy">⚡ Copy Lightning address</button><span class="ln" id="ln-addr">${cfg.lightning.replace(/[<>&"]/g, "")}</span>`);
+  if (dr.length) { $("donate").hidden = false; $("donate-row").innerHTML = dr.join("");
+    const b = $("ln-copy"); if (b) b.addEventListener("click", async () => { try { await navigator.clipboard.writeText(cfg.lightning); b.textContent = "Copied"; } catch (e) { b.textContent = "Select and copy the address"; } }); }
+
+  // ── clock strip ──
+  function clock() {
+    const box = $("clock"); box.innerHTML = "";
+    const W = Math.max(320, box.clientWidth), H = 150, m = { l: 14, r: 14, t: 40, b: 36 };
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": `Cycle ${cur.n} timeline: day ${daysNow} of about ${span}` }, box);
+    const X = (d) => m.l + d / span * (W - m.l - m.r), y = m.t + 18;
+    el("rect", { x: X(pkLo), y: m.t, width: X(pkHi) - X(pkLo), height: 36, fill: "var(--peakband)", stroke: "var(--c1)", "stroke-width": 1 }, svg);
+    el("rect", { x: X(lwLo), y: m.t, width: X(lwHi) - X(lwLo), height: 36, fill: "var(--lowband)", stroke: "var(--loss)", "stroke-width": 1 }, svg);
+    el("line", { x1: X(0), x2: X(span), y1: y, y2: y, stroke: "var(--rule)", "stroke-width": 3 }, svg);
+    el("line", { x1: X(0), x2: X(daysNow), y1: y, y2: y, stroke: "var(--now)", "stroke-width": 3 }, svg);
+    for (let yr = 0; yr <= 4; yr++) { const d = yr * 365; if (d > span) break; el("line", { x1: X(d), x2: X(d), y1: y - 6, y2: y + 6, stroke: "var(--faint)" }, svg); const t = el("text", { x: X(d), y: H - 18, "text-anchor": "middle" }, svg); t.textContent = `day ${d}`; }
+    const tt = el("text", { x: X(span), y: H - 4, "text-anchor": "end" }, svg); tt.textContent = `next halving ≈ ${mfmt(D.next_halving)}`;
+    const t0 = el("text", { x: X(0), y: H - 4 }, svg); t0.textContent = `halving ${mfmt(cur.halving)}`;
+    const mark = (d, lab, sub, above, col = "var(--now)") => {
+      el("circle", { cx: X(d), cy: y, r: 6, fill: col, stroke: "var(--surface)", "stroke-width": 2 }, svg);
+      const a = el("text", { x: X(d), y: above ? m.t - 20 : m.t + 58, "text-anchor": "middle" }, svg); a.textContent = lab; a.style.fill = "var(--ink)"; a.style.fontWeight = 600;
+      const b = el("text", { x: X(d), y: above ? m.t - 6 : m.t + 72, "text-anchor": "middle" }, svg); b.textContent = sub;
+    };
+    mark(cur.peak_days, `Peak · day ${cur.peak_days}`, usd(cur.peak), true);
+    if (cur.low_days) mark(cur.low_days, `Low so far · day ${cur.low_days}`, usd(cur.low), false, "var(--loss)");
+    mark(daysNow, `Today · day ${daysNow}`, usd(D.price), true);
+  }
+
+  // ── projection cards ──
+  const lowTiming = `${mfmt(P.low_window[0])} – ${mfmt(P.low_window[1])}`;
+  const fromPeak = `${dfmt(P.low_from_peak[0])} – ${dfmt(P.low_from_peak[1])}`;
+  const nextPk = `${mfmt(P.next_peak_window[0])} – ${mfmt(P.next_peak_window[1])}`;
+  const p2l = past.map((c) => c.peak_to_low_days);
+  $("cards").innerHTML = `
+    <div class="card"><span class="lab">Next cycle low</span>
+      <span class="status">${daysNow >= lwLo && daysNow <= lwHi ? "Inside the historical low window now" : daysNow < lwLo ? "Window ahead" : "Past the historical window"}</span>
+      <span class="when">${dfmt(P.low_from_peak[0]).replace(/, \d{4}/, "")} – ${dfmt(P.low_from_peak[1])}</span>
+      <span class="how">if the old rhythm holds</span>
+      <ul>
+        <li>Past lows came <b>${Math.min(...p2l)}–${Math.max(...p2l)} days after the peak</b> → ${fromPeak}.</li>
+        <li>By days after the halving (${lwLo}–${lwHi}) → <b>${lowTiming}</b>; the lengthening trend across cycles points as late as ${mfmt(P.low_trend)}.</li>
+        <li>Past falls ran <b>${pct(P.dd_range[0])} to ${pct(P.dd_range[1])}</b>, shrinking each cycle (trend ${pct(P.dd_trend)} → about <b>${usd(P.low_price_trend)}</b>). The low so far is ${usd(cur.low)} (${pct(cur.drawdown)}) on ${dfmt(cur.low_date)}. If the shallower falls continue, that may already have been the bottom.</li>
+      </ul></div>
+    <div class="card"><span class="lab">Next market high</span>
+      <span class="status">After the ≈${mfmt(D.next_halving)} halving</span>
+      <span class="when">${nextPk}</span>
+      <span class="how">peak days ${Math.min(...past.map((c) => c.peak_days), cur.peak_days)}–${Math.max(...past.map((c) => c.peak_days), cur.peak_days)} after the next halving</span>
+      <ul>
+        <li>The last three peaks landed <b>525–546 days</b> after their halving, a tight cluster, which puts the next one around <b>${mfmt(new Date(ts(D.next_halving) + 525 * day).toISOString().slice(0, 10))}–${mfmt(new Date(ts(D.next_halving) + 546 * day).toISOString().slice(0, 10))}</b>. On this clock, a new cycle high before the next halving would be early.</li>
+        <li>Low-to-next-peak gains keep shrinking: <b>${P.low_to_peak.map((v) => mult(v)).join(" → ")}</b>. Continuing the decay gives about <b>${P.low_to_peak_next.toFixed(1)}×</b> off the coming low: roughly <b>${usd(P.next_peak_from_low[0])}–${usd(P.next_peak_from_low[1])}</b>, depending on how deep the low is.</li>
+        <li>On this clock, <b>${+cur.halving.slice(0, 4) + 3} is a recovery year</b> and <b>${D.next_halving.slice(0, 4)} a halving year</b>. Both have been strong in every past cycle (table below), but neither has held a cycle top.</li>
+      </ul></div>`;
+
+  // ── overlay ──
+  function overlay() {
+    const box = $("overlay"); box.innerHTML = "";
+    const W = Math.max(320, box.clientWidth), H = W < 560 ? 320 : 430, m = { l: 52, r: 16, t: 12, b: 30 };
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Price multiple of halving-day price by days since halving, four cycles" }, box);
+    const maxD = 1460;
+    const wd = D.weekly.d.map(ts), wp = D.weekly.p;
+    const series = C.map((c, k) => {
+      const h = ts(c.halving), end = Math.min(ts(c.next_halving), ts(D.asof)), base = c.halving_price, pts = [];
+      for (let i = 0; i < wd.length; i++) if (wd[i] >= h && wd[i] <= end) pts.push([(wd[i] - h) / day, wp[i] / base]);
+      return { c, k, pts };
+    });
+    const X = (d) => m.l + d / maxD * (W - m.l - m.r);
+    const lo = 0.3, hi = 150;
+    const Y = (v) => m.t + (1 - (Math.log(v) - Math.log(lo)) / (Math.log(hi) - Math.log(lo))) * (H - m.t - m.b);
+    el("rect", { x: X(pkLo), y: m.t, width: X(pkHi) - X(pkLo), height: H - m.t - m.b, fill: "var(--peakband)" }, svg);
+    el("rect", { x: X(lwLo), y: m.t, width: X(lwHi) - X(lwLo), height: H - m.t - m.b, fill: "var(--lowband)" }, svg);
+    for (const v of [0.5, 1, 2, 5, 10, 20, 50, 100]) { el("line", { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), class: "gl" }, svg); el("text", { x: m.l - 6, y: Y(v) + 4, "text-anchor": "end" }, svg).textContent = v + "×"; }
+    el("line", { x1: m.l, x2: W - m.r, y1: Y(1), y2: Y(1), stroke: "var(--faint)", "stroke-dasharray": "2 3" }, svg);
+    for (let d = 0; d <= maxD; d += 365) el("text", { x: X(d), y: H - 8, "text-anchor": "middle" }, svg).textContent = d === 0 ? "halving" : `+${d / 365} yr`;
+    for (const s of series) {
+      const d = s.pts.map(([x, v], i) => `${i ? "L" : "M"}${X(x).toFixed(1)},${Y(Math.max(v, lo)).toFixed(1)}`).join("");
+      el("path", { d, fill: "none", stroke: COL[s.k], "stroke-width": s.k === 3 ? 3 : 1.8, "stroke-opacity": s.k === 3 ? 1 : .9 }, svg);
+      for (const [dd, v] of [[s.c.peak_days, s.c.peak / s.c.halving_price], [s.c.low_days, s.c.low / s.c.halving_price]]) {
+        if (dd == null || isNaN(v)) continue;
+        el("circle", { cx: X(dd), cy: Y(v), r: 5, fill: COL[s.k], stroke: "var(--surface)", "stroke-width": 2 }, svg);
+      }
+      const lp = s.pts[s.pts.length - 1];
+      const t = el("text", { x: X(lp[0]) + 6, y: Y(lp[1]) + 4 }, svg); t.textContent = s.k === 3 ? "now" : ""; t.style.fill = COL[s.k]; t.style.fontWeight = 700;
+    }
+    const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; box.appendChild(tip);
+    const cross = el("line", { y1: m.t, y2: H - m.b, stroke: "var(--faint)", visibility: "hidden" }, svg);
+    const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", (ev) => {
+      const rc = svg.getBoundingClientRect(), sx = (ev.clientX - rc.left) * (W / rc.width), dd = Math.max(0, Math.min(maxD, (sx - m.l) / (W - m.l - m.r) * maxD));
+      cross.setAttribute("x1", X(dd)); cross.setAttribute("x2", X(dd)); cross.setAttribute("visibility", "visible");
+      tip.innerHTML = `<div class="d">Day ${Math.round(dd)} after halving</div>` + series.map((s) => {
+        let best = null; for (const p of s.pts) if (!best || Math.abs(p[0] - dd) < Math.abs(best[0] - dd)) best = p;
+        const ok = best && Math.abs(best[0] - dd) < 8;
+        return `<div class="r"><span><span class="sw" style="background:${COL[s.k]}"></span>Cycle ${s.c.n}</span><b>${ok ? mult(best[1]) + " · " + usd(best[1] * s.c.halving_price) : "—"}</b></div>`;
+      }).join("");
+      tip.hidden = false; const b = box.getBoundingClientRect(); let l = ev.clientX - b.left + 14; if (l + 240 > b.width) l -= 262;
+      tip.style.left = l + "px"; tip.style.top = Math.max(0, ev.clientY - b.top - 80) + "px";
+    });
+    hit.addEventListener("pointerleave", () => { tip.hidden = true; cross.setAttribute("visibility", "hidden"); });
+  }
+  $("ov-legend").innerHTML = C.map((c, k) => `<span><span class="ln" style="border-color:${COL[k]}"></span>Cycle ${c.n} · ${new Date(c.halving + "T12:00:00").getFullYear()}${k === 3 ? " (current)" : ""}</span>`).join("") +
+    `<span><span class="bx" style="background:var(--peakband)"></span>Peak window</span><span><span class="bx" style="background:var(--lowband)"></span>Low window</span>`;
+
+  // ── cycle table ──
+  $("cycles").innerHTML = `<thead><tr><th>Cycle</th><th>Halving</th><th class="r">Peak</th><th class="r">Days after halving</th><th class="r">Peak ÷ halving price</th><th class="r">Low</th><th class="r">Days after halving</th><th class="r">Fall from peak</th><th class="r">Peak → low</th></tr></thead><tbody>` +
+    C.map((c, k) => `<tr class="${k === 3 ? "cur" : ""}"><td><span class="dot" style="background:${COL[k]}"></span>${c.n}${k === 3 ? " <span class='sub' style='display:inline'>(so far)</span>" : ""}</td>
+      <td class="num">${dfmt(c.halving)}<span class="sub">${usd(c.halving_price)}</span></td>
+      <td class="r num">${usd(c.peak)}<span class="sub">${dfmt(c.peak_date)}</span></td><td class="r num">${c.peak_days}</td><td class="r num">${mult(c.peak_mult)}</td>
+      <td class="r num">${c.low ? usd(c.low) : "—"}<span class="sub">${c.low_date ? dfmt(c.low_date) : ""}</span></td><td class="r num">${c.low_days ?? "—"}</td>
+      <td class="r num neg">${c.drawdown != null ? pct(c.drawdown) : "—"}</td><td class="r num">${c.peak_to_low_days != null ? c.peak_to_low_days + " days" : "—"}</td></tr>`).join("") + "</tbody>";
+
+  // ── returns by cycle year ──
+  const Y = D.years, roles = [["Halving year", 0], ["Peak year", 1], ["Bear year", 2], ["Recovery year", 3]];
+  const hy = C.map((c) => +c.halving.slice(0, 4)).concat([+D.next_halving.slice(0, 4)]);
+  const thisYear = +D.asof.slice(0, 4);
+  $("years").innerHTML = `<thead><tr><th>Year of cycle</th>${hy.map((y, k) => `<th class="r">Cycle ${k + 1}</th>`).join("")}</tr></thead><tbody>` +
+    roles.map(([lab, off]) => `<tr><td>${lab}</td>${hy.map((y0, k) => { const y = y0 + off; const v = Y[String(y)]; const next = y > thisYear && y <= thisYear + 2 && v == null;
+      return `<td class="r num ${next ? "next" : ""} ${v != null ? (v > 0 ? "pos" : "neg") : ""}">${v != null ? pct(v) : next ? "ahead" : "—"}<span class="sub">${y}${y === thisYear ? " to date" : ""}</span></td>`; }).join("")}</tr>`).join("") + "</tbody>";
+
+  // ── difficulty table ──
+  const maxDbl = Math.max(...C.map((c) => c.hash_doublings));
+  $("diff").innerHTML = `<thead><tr><th>Cycle</th><th class="r">Hash rate growth</th><th>Doublings of difficulty</th><th class="r">Price growth</th><th class="r">Price gain per difficulty doubling</th><th class="r">Elasticity</th></tr></thead><tbody>` +
+    C.map((c, k) => `<tr class="${k === 3 ? "cur" : ""}"><td><span class="dot" style="background:${COL[k]}"></span>${c.n}${k === 3 ? " <span class='sub' style='display:inline'>(to date)</span>" : ""}</td>
+      <td class="r num">${c.hash_mult >= 1000 ? Math.round(c.hash_mult).toLocaleString() + "×" : mult(c.hash_mult)}</td>
+      <td><div class="inbar"><i style="width:${c.hash_doublings / maxDbl * 100}%;background:${COL[k]}"></i></div><span class="sub">${c.hash_doublings.toFixed(1)} doublings</span></td>
+      <td class="r num">${mult(c.price_mult_cycle)}</td><td class="r num">${c.per_doubling.toFixed(2)}×</td><td class="r num">${c.elasticity.toFixed(2)}</td></tr>`).join("") + "</tbody>" +
+    `<tfoot><tr><td colspan="6" style="color:var(--muted);font-size:13px;border:0;padding-top:10px">Elasticity = % price change per % hash-rate change (log scale). Difficulty growth has collapsed from 16 doublings in cycle 1 (the move from GPUs to ASIC miners) to ${cur.hash_doublings.toFixed(1)} so far in cycle ${cur.n}, while price gained <i>more</i> per doubling in cycles 2–3 than in cycle 1. What has diminished is the growth itself, and what each unit of hash earns (below).</td></tr></tfoot>`;
+
+  // ── hashprice ──
+  function hashprice() {
+    const box = $("hashprice"); box.innerHTML = "";
+    const W = Math.max(320, box.clientWidth), H = 300, m = { l: 70, r: 16, t: 12, b: 28 };
+    const svg = el("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Miner revenue per petahash per day, log scale" }, box);
+    const d = D.hashprice.d.map(ts), v = D.hashprice.v, i0 = d.findIndex((t) => t >= ts("2014-01-01"));
+    const xs = d.slice(i0), vs = v.slice(i0);
+    const lo = Math.min(...vs) * 0.7, hi = Math.max(...vs) * 1.3;
+    const X = (t) => m.l + (t - xs[0]) / (xs[xs.length - 1] - xs[0]) * (W - m.l - m.r);
+    const Y = (x) => m.t + (1 - (Math.log(x) - Math.log(lo)) / (Math.log(hi) - Math.log(lo))) * (H - m.t - m.b);
+    for (let e = Math.ceil(Math.log10(lo)); e <= Math.floor(Math.log10(hi)); e++) { const val = 10 ** e; el("line", { x1: m.l, x2: W - m.r, y1: Y(val), y2: Y(val), class: "gl" }, svg); el("text", { x: m.l - 6, y: Y(val) + 4, "text-anchor": "end" }, svg).textContent = usd(val); }
+    for (let y = 2014; y <= 2026; y += 2) el("text", { x: X(ts(y + "-01-01")), y: H - 8, "text-anchor": "middle" }, svg).textContent = y;
+    for (const h of D.halvings.slice(1)) el("line", { x1: X(ts(h)), x2: X(ts(h)), y1: m.t, y2: H - m.b, stroke: "var(--faint)", "stroke-dasharray": "3 4" }, svg);
+    el("path", { d: xs.map((t, i) => `${i ? "L" : "M"}${X(t).toFixed(1)},${Y(vs[i]).toFixed(1)}`).join(""), fill: "none", stroke: "var(--now)", "stroke-width": 2 }, svg);
+    const hp = D.hp_year, a = hp["2016"], b = hp[String(new Date(D.asof).getFullYear())];
+    const cagr = Math.pow(b / a, 1 / (new Date(D.asof).getFullYear() - 2016)) - 1;
+    const t = el("text", { x: W - m.r, y: m.t + 14, "text-anchor": "end" }, svg); t.textContent = `2016 avg ${usd(a)} → ${new Date(D.asof).getFullYear()} ${usd(b)}  (${pct(cagr)} a year)`; t.style.fill = "var(--ink)";
+    const tip = document.createElement("div"); tip.className = "tip"; tip.hidden = true; box.appendChild(tip);
+    const hit = el("rect", { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: "transparent" }, svg);
+    hit.addEventListener("pointermove", (ev) => { const rc = svg.getBoundingClientRect(), sx = (ev.clientX - rc.left) * (W / rc.width); let i = 0, bd = 1e18; xs.forEach((x, k) => { const q = Math.abs(X(x) - sx); if (q < bd) { bd = q; i = k; } });
+      tip.innerHTML = `<div class="d">${dfmt(new Date(xs[i]).toISOString().slice(0, 10))}</div><div class="r"><span>Revenue per PH/s/day</span><b>${usd(vs[i])}</b></div>`; tip.hidden = false;
+      const bb = box.getBoundingClientRect(); let l = ev.clientX - bb.left + 14; if (l + 220 > bb.width) l -= 240; tip.style.left = l + "px"; tip.style.top = Math.max(0, ev.clientY - bb.top - 50) + "px"; });
+    hit.addEventListener("pointerleave", () => { tip.hidden = true; });
+  }
+
+  const draw = () => { clock(); overlay(); hashprice(); };
+  draw();
+  let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(draw, 150); });
+})();
+</script>
+</body>
+</html>
