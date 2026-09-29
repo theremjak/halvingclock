@@ -1,0 +1,10 @@
+// Static site on Cloudflare Workers (Pages now lives under Workers). `wrangler deploy` uploads ./site.
+{
+  "name": "halvingclock",
+  "compatibility_date": "2026-09-01",
+  "assets": { "directory": "./site" },
+  "routes": [
+    { "pattern": "halvingclock.com", "custom_domain": true },
+    { "pattern": "www.halvingclock.com", "custom_domain": true }
+  ]
+}

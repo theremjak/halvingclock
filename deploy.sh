@@ -7,4 +7,4 @@ cd "$(dirname "$0")"
 export PATH="/opt/homebrew/bin:$PATH"
 PY="${PY:-../.venv/bin/python}"
 "$PY" build.py "$@"
-npx wrangler@latest pages deploy site --project-name=halvingclock --branch=main
+npx wrangler@latest deploy
