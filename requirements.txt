@@ -2,3 +2,6 @@ numpy>=1.26
 pandas>=2.1
 requests>=2.31
 pillow>=10.1
+coincurve>=19
+websockets>=12
+requests-oauthlib>=1.3

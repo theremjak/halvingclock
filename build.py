@@ -213,6 +213,19 @@ def og_image(d, path):
     img.save(path, optimize=True)
 
 
+def state(d):
+    """Small daily snapshot the social poster compares against yesterday's (milestones = changes between the two)."""
+    cur, past = d["cycles"][-1], d["cycles"][:-1]
+    day = (pd.Timestamp(d["asof"]) - pd.Timestamp(cur["halving"])).days
+    return dict(asof=d["asof"], cycle=cur["n"], day=day, price=round(d["price"], 2), peak=cur["peak"], peak_date=cur["peak_date"],
+                low=cur.get("low"), low_date=cur.get("low_date"), dd=round(d["cur_dd"], 4), remaining=d["remaining"],
+                next_height=d["next_height"], next_halving=d["next_halving"],
+                days_to_halving=(pd.Timestamp(d["next_halving"]) - pd.Timestamp(d["asof"])).days,
+                pk_window=[min(c["peak_days"] for c in past), max(c["peak_days"] for c in past)],
+                low_window=[min(c["low_days"] for c in past if c.get("low_days")), max(c["low_days"] for c in past if c.get("low_days"))],
+                low_from_peak=d["proj"]["low_from_peak"])
+
+
 def build(d):
     SITE.mkdir(exist_ok=True)
     tpl = (HERE / "template.html").read_text()
@@ -236,7 +249,23 @@ def build(d):
     (SITE / "robots.txt").write_text(f"User-agent: *\nAllow: /\nSitemap: {url}/sitemap.xml\n")
     (SITE / "sitemap.xml").write_text(f"<?xml version='1.0' encoding='UTF-8'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>"
                                       f"<url><loc>{url}/</loc><lastmod>{d['asof']}</lastmod><changefreq>daily</changefreq></url></urlset>\n")
-    (SITE / "_headers").write_text("/\n  Cache-Control: public, max-age=0, must-revalidate\n/og.png\n  Cache-Control: public, max-age=3600\n")
+    (SITE / "_headers").write_text("/\n  Cache-Control: public, max-age=0, must-revalidate\n/og.png\n  Cache-Control: public, max-age=3600\n"
+                                   "/state.json\n  Cache-Control: public, max-age=0, must-revalidate\n  Access-Control-Allow-Origin: *\n"
+                                   "/.well-known/nostr.json\n  Access-Control-Allow-Origin: *\n")
+    # identity verification: Nostr NIP-05 (halvingclock@halvingclock.com) and Bluesky domain handle (@halvingclock.com)
+    wk = SITE / ".well-known"
+    wk.mkdir(exist_ok=True)
+    if CONFIG.get("nostr_pubkey"):
+        (wk / "nostr.json").write_text(json.dumps({"names": {"halvingclock": CONFIG["nostr_pubkey"], "_": CONFIG["nostr_pubkey"]}}))
+    if CONFIG.get("bluesky_did"):
+        (wk / "atproto-did").write_text(CONFIG["bluesky_did"].strip())
+    (SITE / "state.json").write_text(json.dumps(state(d), indent=1))
+    bd = SITE / "brand"                                  # profile pictures for the social accounts
+    bd.mkdir(exist_ok=True)
+    for size in (400, 1000):
+        src = HERE / "brand" / f"halvingclock-avatar-{size}.png"
+        if src.exists():
+            (bd / f"avatar-{size}.png").write_bytes(src.read_bytes())
     print(f"built site/ · day {day} of cycle {cur['n']} · BTC ${d['price']:,.0f} · next halving ≈ {d['next_halving']} "
           f"({d['remaining']:,} blocks) · index.html {len(html) / 1e3:.0f} KB")
 

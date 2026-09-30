@@ -3,7 +3,12 @@ name: Daily rebuild
 on:
   schedule:
     - cron: "15 6 * * *"      # 06:15 UTC every day (after Bitstamp's daily candle closes at 00:00 UTC)
-  workflow_dispatch: {}        # "Run workflow" button for manual rebuilds
+  workflow_dispatch:
+    inputs:
+      post:
+        description: "Also send today's social posts (scheduled runs always post)"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy
@@ -20,6 +25,8 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Save yesterday's state (for milestone detection and the once-a-day guard)
+        run: curl -fsS https://halvingclock.com/state.json -o prev_state.json || echo '{}' > prev_state.json
       - name: Build (fetch mempool.space + Bitstamp, regenerate site/)
         run: python build.py
       - name: Deploy to Cloudflare (Worker serving ./site)
@@ -29,3 +36,14 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.143.0"   # the action's default is older and can't deploy an assets-only Worker
           command: deploy
+      - name: Social posts (Bluesky, Nostr, X — each skipped until its secrets exist)
+        if: github.event_name == 'schedule' || inputs.post
+        env:
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+          NOSTR_NSEC: ${{ secrets.NOSTR_NSEC }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+        run: python social.py --prev prev_state.json
