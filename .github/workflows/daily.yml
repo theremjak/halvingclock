@@ -29,15 +29,10 @@ jobs:
         run: curl -fsS https://halvingclock.com/state.json -o prev_state.json || echo '{}' > prev_state.json
       - name: Build (fetch mempool.space + Bitstamp, regenerate site/)
         run: python build.py
-      - name: Deploy to Cloudflare (Worker serving ./site)
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.143.0"   # the action's default is older and can't deploy an assets-only Worker
-          command: deploy
-      - name: Social posts (Bluesky, Nostr, X — each skipped until its secrets exist)
+      - name: Social posts (Bluesky, Nostr, X; each skipped until its secrets exist). Runs before deploy so the posted marker ships with the site
+        id: social
         if: github.event_name == 'schedule' || inputs.post
+        continue-on-error: true         # a platform outage must not stop the site update
         env:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
@@ -47,3 +42,13 @@ jobs:
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
         run: python social.py --prev prev_state.json
+      - name: Deploy to Cloudflare (Worker serving ./site)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "4.143.0"   # the action's default is older and can't deploy an assets-only Worker
+          command: deploy
+      - name: Report social-post failure (after the site is deployed)
+        if: steps.social.outcome == 'failure'
+        run: echo "::error::One or more social posts failed; see the Social posts step log." && exit 1

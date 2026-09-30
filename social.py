@@ -291,21 +291,28 @@ def main():
             prev = json.loads(Path(a.prev).read_text())
         except json.JSONDecodeError:
             prev = None
-    if prev and prev.get("asof") == s["asof"] and not a.force:
+    if prev and prev.get("posted_for") == s["asof"] and not a.force:
         print(f"already posted for {s['asof']}; nothing to do")
         return
-    text, alt, is_milestone = compose(prev, s)
+    base = (prev or {}).get("posted_state") or prev   # compare with the numbers at the LAST POST, not the last rebuild
+    text, alt, is_milestone = compose(base, s)
     print(("MILESTONE " if is_milestone else "DAILY ") + f"post ({len(text)} chars):\n{text}\n")
     if a.dry_run:
         return
     img = SITE / "og.png"
-    failures = 0
+    failures, sent = 0, 0
     for name, fn in (("Bluesky", lambda: post_bluesky(text, img, alt)), ("Nostr", lambda: post_nostr(text)), ("X", lambda: post_x(text, img))):
         try:
-            print(f"{name}: {fn()}")
+            res = fn()
+            print(f"{name}: {res}")
+            sent += res.startswith("posted")
         except Exception as e:
             failures += 1
             print(f"{name}: FAILED {e}")
+    if sent:                                          # record the post in the state that is about to be deployed
+        s["posted_for"] = s["asof"]
+        s["posted_state"] = {k: v for k, v in s.items() if k not in ("posted_for", "posted_state")}
+        (SITE / "state.json").write_text(json.dumps(s, indent=1))
     if failures:
         sys.exit(1)                                   # surfaces in the Actions run (and GitHub's failure email)
 

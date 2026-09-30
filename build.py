@@ -259,7 +259,15 @@ def build(d):
         (wk / "nostr.json").write_text(json.dumps({"names": {"halvingclock": CONFIG["nostr_pubkey"], "_": CONFIG["nostr_pubkey"]}}))
     if CONFIG.get("bluesky_did"):
         (wk / "atproto-did").write_text(CONFIG["bluesky_did"].strip())
-    (SITE / "state.json").write_text(json.dumps(state(d), indent=1))
+    st = state(d)
+    prev_path = HERE / "prev_state.json"                 # yesterday's live state (downloaded by the workflow), if present
+    if prev_path.exists():
+        try:
+            prev = json.loads(prev_path.read_text())
+            st["posted_for"], st["posted_state"] = prev.get("posted_for"), prev.get("posted_state")
+        except json.JSONDecodeError:
+            pass
+    (SITE / "state.json").write_text(json.dumps(st, indent=1))
     bd = SITE / "brand"                                  # profile pictures for the social accounts
     bd.mkdir(exist_ok=True)
     for size in (400, 1000):
