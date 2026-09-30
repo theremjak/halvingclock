@@ -31,7 +31,8 @@ SITE = HERE / "site"
 CONFIG = json.loads((HERE / "config.json").read_text())
 URL = (CONFIG.get("site_url") or "https://halvingclock.com").rstrip("/")
 LINK = URL.replace("https://", "")
-RELAYS = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net", "wss://relay.nostr.band", "wss://nostr.wine"]
+RELAYS = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net", "wss://relay.nostr.band", "wss://relay.snort.social",
+          "wss://nostr.mom", "wss://offchain.pub", "wss://purplepag.es"]   # nostr.wine dropped: paid relay, refuses writes
 ORD = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 5: "5th", 6: "6th"}
 
 
