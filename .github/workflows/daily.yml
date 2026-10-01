@@ -48,20 +48,24 @@ jobs:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
           BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
           NOSTR_NSEC: ${{ secrets.NOSTR_NSEC }}
-          X_API_KEY: ${{ secrets.X_API_KEY }}
-          X_API_SECRET: ${{ secrets.X_API_SECRET }}
-          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}                  # OAuth 2.0 (pay-per-use apps)
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN_INIT: ${{ secrets.X_REFRESH_TOKEN_INIT }}
+          X_INIT_ID: ${{ secrets.X_INIT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}  # rotating X refresh token lives in Workers KV
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           ALERT_SMTP_USER: ${{ secrets.ALERT_SMTP_USER }}           # milestone drafts are emailed, not posted
           ALERT_SMTP_APP_PASSWORD: ${{ secrets.ALERT_SMTP_APP_PASSWORD }}
         run: python social.py --prev prev_state.json
       - name: Test X post
         if: inputs.test_x
         env:
-          X_API_KEY: ${{ secrets.X_API_KEY }}
-          X_API_SECRET: ${{ secrets.X_API_SECRET }}
-          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
-          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          X_CLIENT_ID: ${{ secrets.X_CLIENT_ID }}                  # OAuth 2.0 (pay-per-use apps)
+          X_CLIENT_SECRET: ${{ secrets.X_CLIENT_SECRET }}
+          X_REFRESH_TOKEN_INIT: ${{ secrets.X_REFRESH_TOKEN_INIT }}
+          X_INIT_ID: ${{ secrets.X_INIT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}  # rotating X refresh token lives in Workers KV
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: python social.py --x-diagnose && python social.py --prev prev_state.json --only x --force
       - name: Test milestone email
         if: inputs.test_alert

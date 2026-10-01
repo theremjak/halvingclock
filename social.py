@@ -292,68 +292,66 @@ def nostr_keygen(out):
 
 # ───────────────────────── X ─────────────────────────
 
-def x_auth():
+def x_session():
+    """(kind, auth) for X: OAuth 2.0 user token (pay-per-use apps) when X_CLIENT_ID is set, else OAuth 1.0a keys."""
+    if os.environ.get("X_CLIENT_ID"):
+        import x_oauth
+        tok = x_oauth.access_token()
+        return ("oauth2", {"Authorization": f"Bearer {tok}"}) if tok else (None, None)
     keys = [(os.environ.get(k) or "").strip() for k in ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_SECRET")]
     if not all(keys):
-        return None
+        return None, None
     from requests_oauthlib import OAuth1
-    return OAuth1(*keys)
+    return "oauth1", OAuth1(*keys)
 
 
-def x_whoami():
-    """Which account do the X tokens belong to? Refuse to post if it isn't config.json's "twitter" handle."""
-    auth = x_auth()
-    if auth is None:
-        return None
-    r = requests.get("https://api.x.com/2/users/me", auth=auth, timeout=30)
+def _x(method, url, kind, auth, **kw):
+    if kind == "oauth2":
+        kw["headers"] = {**kw.get("headers", {}), **auth}
+    else:
+        kw["auth"] = auth
+    return requests.request(method, url, timeout=60, **kw)
+
+
+def x_whoami(kind, auth):
+    r = _x("GET", "https://api.x.com/2/users/me", kind, auth)
     if not r.ok:
         raise RuntimeError(f"X {r.status_code}: {r.text[:300]}")
     return r.json()["data"]["username"]
 
 
 def x_diagnose():
-    """Print safe facts about the X keys (lengths/shape, the public user id inside the access token) and how three
-    endpoints answer. Never prints a key."""
-    names = ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_SECRET")
-    vals = {k: (os.environ.get(k) or "").strip() for k in names}
-    expect = {"X_API_KEY": "~25 chars", "X_API_SECRET": "~50 chars", "X_ACCESS_TOKEN": "~50 chars, '<userid>-<…>'", "X_ACCESS_SECRET": "~45 chars"}
-    for k, v in vals.items():
-        print(f"{k:16s} length {len(v):3d} (expected {expect[k]}) | contains '-': {'-' in v} | "
-              f"{'starts with digits: user id ' + v.split('-')[0] if k == 'X_ACCESS_TOKEN' and v.split('-')[0].isdigit() else ''}")
-    auth = x_auth()
-    if auth is None:
-        return print("missing keys")
-    for url in ("https://api.x.com/2/users/me", "https://api.twitter.com/2/users/me",
-                "https://api.twitter.com/1.1/account/verify_credentials.json?skip_status=true"):
-        r = requests.get(url, auth=auth, timeout=30)
-        body = r.text[:300].replace("\n", " ")
-        print(f"{r.status_code} {url}\n    {body}")
+    kind, auth = x_session()
+    if kind is None:
+        return print("X: no credentials (X_CLIENT_ID… for OAuth 2.0, or X_API_KEY… for OAuth 1.0a)")
+    print(f"X auth mode: {kind}; account: @{x_whoami(kind, auth)}")
 
 
 def post_x(text, img):
-    auth = x_auth()
-    if auth is None:
-        return "skipped (no X_* keys)"
+    kind, auth = x_session()
+    if kind is None:
+        return "skipped (no X credentials)"
     want = (CONFIG.get("twitter") or "").lstrip("@").lower()
-    who = x_whoami()
+    who = x_whoami(kind, auth)
     if want and who.lower() != want:
         raise RuntimeError(f"X tokens belong to @{who}, not @{want}; refusing to post")
     media_id = None
-    r = requests.post("https://api.x.com/2/media/upload", auth=auth, timeout=60,
-                      files={"media": ("og.png", img.read_bytes(), "image/png")}, data={"media_category": "tweet_image"})
+    r = _x("POST", "https://api.x.com/2/media/upload", kind, auth,
+           files={"media": ("og.png", img.read_bytes(), "image/png")}, data={"media_category": "tweet_image"})
     if r.ok:
-        media_id = (r.json().get("data") or {}).get("id")
-    else:                                           # fall back to the v1.1 upload endpoint
-        r1 = requests.post("https://upload.twitter.com/1.1/media/upload.json", auth=auth, files={"media": img.read_bytes()}, timeout=60)
+        media_id = (r.json().get("data") or {}).get("id") or r.json().get("media_id_string")
+    elif kind == "oauth1":                          # v1.1 upload only accepts OAuth 1.0a
+        r1 = _x("POST", "https://upload.twitter.com/1.1/media/upload.json", kind, auth, files={"media": img.read_bytes()})
         if r1.ok:
             media_id = r1.json().get("media_id_string")
+    media_note = "" if media_id else f" (text only; image upload failed: {r.status_code} {r.text[:120]})"
     body = {"text": text}
     if media_id:
-        body["media"] = {"media_ids": [media_id]}
-    r = requests.post("https://api.x.com/2/tweets", auth=auth, json=body, timeout=30)
+        body["media"] = {"media_ids": [str(media_id)]}
+    r = _x("POST", "https://api.x.com/2/tweets", kind, auth, json=body)
     if not r.ok:
         raise RuntimeError(f"X {r.status_code}: {r.text[:300]}")
-    return f"posted https://x.com/i/status/{r.json()['data']['id']}" + ("" if media_id else " (text only; image upload failed)")
+    return f"posted https://x.com/{who}/status/{r.json()['data']['id']}{media_note}"
 
 
 # ───────────────────────── main ─────────────────────────
