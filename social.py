@@ -311,6 +311,25 @@ def x_whoami():
     return r.json()["data"]["username"]
 
 
+def x_diagnose():
+    """Print safe facts about the X keys (lengths/shape, the public user id inside the access token) and how three
+    endpoints answer. Never prints a key."""
+    names = ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_SECRET")
+    vals = {k: (os.environ.get(k) or "").strip() for k in names}
+    expect = {"X_API_KEY": "~25 chars", "X_API_SECRET": "~50 chars", "X_ACCESS_TOKEN": "~50 chars, '<userid>-<…>'", "X_ACCESS_SECRET": "~45 chars"}
+    for k, v in vals.items():
+        print(f"{k:16s} length {len(v):3d} (expected {expect[k]}) | contains '-': {'-' in v} | "
+              f"{'starts with digits: user id ' + v.split('-')[0] if k == 'X_ACCESS_TOKEN' and v.split('-')[0].isdigit() else ''}")
+    auth = x_auth()
+    if auth is None:
+        return print("missing keys")
+    for url in ("https://api.x.com/2/users/me", "https://api.twitter.com/2/users/me",
+                "https://api.twitter.com/1.1/account/verify_credentials.json?skip_status=true"):
+        r = requests.get(url, auth=auth, timeout=30)
+        body = r.text[:300].replace("\n", " ")
+        print(f"{r.status_code} {url}\n    {body}")
+
+
 def post_x(text, img):
     auth = x_auth()
     if auth is None:
@@ -347,12 +366,15 @@ def main():
     ap.add_argument("--nostr-profile", action="store_true")
     ap.add_argument("--nostr-keygen", metavar="FILE")
     ap.add_argument("--test-alert", action="store_true", help="email a sample milestone draft (checks the Gmail setup)")
+    ap.add_argument("--x-diagnose", action="store_true")
     ap.add_argument("--only", choices=["bluesky", "nostr", "x"], help="post to just this platform (with --force for a test post)")
     a = ap.parse_args()
     if a.nostr_keygen:
         return nostr_keygen(a.nostr_keygen)
     if a.nostr_profile:
         return nostr_profile()
+    if a.x_diagnose:
+        return x_diagnose()
     if a.test_alert:
         st = json.loads((SITE / "state.json").read_text())
         t, b = reddit_draft([f"🧪 Test alert: this is what a milestone email looks like (day {st['day']})."], st)

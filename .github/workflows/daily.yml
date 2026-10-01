@@ -62,7 +62,7 @@ jobs:
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
-        run: python social.py --prev prev_state.json --only x --force
+        run: python social.py --x-diagnose && python social.py --prev prev_state.json --only x --force
       - name: Test milestone email
         if: inputs.test_alert
         env:
