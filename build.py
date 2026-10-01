@@ -223,7 +223,12 @@ def state(d):
                 days_to_halving=(pd.Timestamp(d["next_halving"]) - pd.Timestamp(d["asof"])).days,
                 pk_window=[min(c["peak_days"] for c in past), max(c["peak_days"] for c in past)],
                 low_window=[min(c["low_days"] for c in past if c.get("low_days")), max(c["low_days"] for c in past if c.get("low_days"))],
-                low_from_peak=d["proj"]["low_from_peak"])
+                low_from_peak=d["proj"]["low_from_peak"],
+                # cycle history quoted by the launch/milestone drafts
+                past=[dict(n=c["n"], halving=c["halving"], peak_days=c["peak_days"], low_days=c.get("low_days"),
+                           drawdown=round(c["drawdown"], 3) if c.get("drawdown") is not None else None) for c in past],
+                peak_days_cur=cur["peak_days"], low_days_cur=cur.get("low_days"),
+                low_to_peak=[round(x, 1) for x in d["proj"]["low_to_peak"]])
 
 
 def build(d):
