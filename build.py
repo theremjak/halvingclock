@@ -251,7 +251,8 @@ def build(d):
                                       f"<url><loc>{url}/</loc><lastmod>{d['asof']}</lastmod><changefreq>daily</changefreq></url></urlset>\n")
     (SITE / "_headers").write_text("/\n  Cache-Control: public, max-age=0, must-revalidate\n/og.png\n  Cache-Control: public, max-age=3600\n"
                                    "/state.json\n  Cache-Control: public, max-age=0, must-revalidate\n  Access-Control-Allow-Origin: *\n"
-                                   "/.well-known/nostr.json\n  Access-Control-Allow-Origin: *\n")
+                                   "/.well-known/nostr.json\n  Access-Control-Allow-Origin: *\n  Content-Type: application/json\n"
+                                   "/.well-known/atproto-did\n  Content-Type: text/plain; charset=utf-8\n")
     # identity verification: Nostr NIP-05 (halvingclock@halvingclock.com) and Bluesky domain handle (@halvingclock.com)
     wk = SITE / ".well-known"
     wk.mkdir(exist_ok=True)
