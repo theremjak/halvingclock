@@ -1,6 +1,6 @@
 # Show HN
 
-_Generated Sep 30, 2026 from local site/state.json (day 892). Re-run `python launch_posts.py` right before posting._
+_Generated Sep 30, 2026 from halvingclock.com (day 894). Re-run `python launch_posts.py` right before posting._
 
 Post at https://news.ycombinator.com/submit, ideally a weekday between 8 and 10am US Eastern. Stay around for the first two
 hours to answer comments; that matters more than the wording.
@@ -27,7 +27,7 @@ What it shows:
 
 - Each past cycle lined up by days since its halving. The last three peaked 371–546 days after
   the halving and bottomed 777–924 days after. This cycle peaked on day 534 ($124.7k,
-  Oct 2025). Today is day 892, and we're inside that window now.
+  Oct 2025). Today is day 894, and we're inside that window now.
 - Where the old rhythm would put the next low and high. These are projections from three data points, not forecasts, and
   this cycle already broke the pattern once (a new high before the halving, after the US spot ETFs launched).
 - A "returns per unit of mining difficulty" table. The result surprised me: price gained *more* per doubling of
