@@ -97,6 +97,36 @@ def compose(prev, s):
     return text, alt, bool(ms)
 
 
+# ───────────────────────── milestone → Reddit draft (opened as a GitHub issue by the workflow) ─────────────────────────
+
+def reddit_draft(ms, s):
+    """Write milestone_title.txt + milestone_body.md for a hand-posted Reddit comment. Reddit forbids bot posting in the
+    subreddits that matter, so this only drafts; a person posts it."""
+    head = ms[0]
+    for e in ("📉 ", "🚀 ", "🎯 ", "⌛ ", "⏳ ", "⛏️ ", "🟠 "):
+        head = head.replace(e, "")
+    lo, hi = s["low_window"]
+    pk_lo, pk_hi = s["pk_window"]
+    short = head.split(". ")[0].replace(f", on day {s['day']}", "")   # first clause, without repeating the day
+    title = f"Halving Clock milestone: {head.split(':')[0].split('.')[0][:80]} (day {s['day']})"
+    comment = (f"Cycle-timing check, day {s['day']} since the {ORD.get(s['cycle'], s['cycle'])} halving: {head}\n\n"
+               f"For context: the last three cycles peaked {pk_lo}–{pk_hi} days after their halving and bottomed {lo}–{hi} days after. "
+               f"This cycle peaked on day {(datetime.fromisoformat(s['peak_date']) - datetime.fromisoformat(s['asof'])).days + s['day']} "
+               f"({fmt_usd(s['peak'])}); BTC is {fmt_usd(s['price'])} now, {s['dd'] * 100:+.0f}% from that peak"
+               + (f", and the low so far is {fmt_usd(s['low'])} ({(s['low'] / s['peak'] - 1) * 100:+.0f}%)." if s.get("low") else ".")
+               + f" Next halving in about {s['days_to_halving']} days ({s['remaining']:,} blocks).\n\n"
+               f"Full comparison (free, updates daily): {LINK}. Not a prediction: three data points, and the ETF era may have changed the rhythm.")
+    body = (f"**Milestone detected on {s['asof']}:** {ms[0]}\n\n" + ("Also today: " + " · ".join(ms[1:]) + "\n\n" if len(ms) > 1 else "")
+            + "### Suggested r/BitcoinMarkets Daily Discussion comment\n\nPaste as a comment in the pinned daily thread (not a standalone post):\n\n"
+            + "```\n" + comment + "\n```\n\n"
+            + "### If it's big enough for a standalone r/Bitcoin discussion post\n\n"
+            + f"**Title:** Day {s['day']} of the cycle: {short[0].lower() + short[1:]}\n\n"
+            + "Reuse the comment above as the body, check the sidebar rules first, and keep it to about one standalone post a month.\n\n"
+            + "_Close this issue once posted (or if you skip it)._")
+    (HERE / "milestone_title.txt").write_text(title)
+    (HERE / "milestone_body.md").write_text(body)
+
+
 # ───────────────────────── Bluesky ─────────────────────────
 
 def post_bluesky(text, img, alt):
@@ -297,6 +327,8 @@ def main():
         return
     base = (prev or {}).get("posted_state") or prev   # compare with the numbers at the LAST POST, not the last rebuild
     text, alt, is_milestone = compose(base, s)
+    if is_milestone:
+        reddit_draft(milestones(base, s), s)
     print(("MILESTONE " if is_milestone else "DAILY ") + f"post ({len(text)} chars):\n{text}\n")
     if a.dry_run:
         return

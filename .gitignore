@@ -1,5 +1,7 @@
 .DS_Store
 __pycache__/
 cache/
+milestone_body.md
+milestone_title.txt
 prev_state.json
 site/

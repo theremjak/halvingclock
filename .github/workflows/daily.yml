@@ -14,6 +14,10 @@ concurrency:
   group: deploy
   cancel-in-progress: false
 
+permissions:
+  contents: read
+  issues: write          # milestone alerts open an issue (GitHub emails the repo owner)
+
 jobs:
   build-deploy:
     runs-on: ubuntu-latest
@@ -49,6 +53,11 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.143.0"   # the action's default is older and can't deploy an assets-only Worker
           command: deploy
+      - name: Milestone alert (GitHub issue with a ready-to-paste Reddit draft)
+        if: steps.social.outcome != 'skipped' && hashFiles('milestone_body.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh issue create --repo "${{ github.repository }}" --title "$(cat milestone_title.txt)" --body-file milestone_body.md --label milestone
       - name: Report social-post failure (after the site is deployed)
         if: steps.social.outcome == 'failure'
         run: echo "::error::One or more social posts failed; see the Social posts step log." && exit 1
