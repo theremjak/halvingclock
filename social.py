@@ -292,12 +292,33 @@ def nostr_keygen(out):
 
 # ───────────────────────── X ─────────────────────────
 
-def post_x(text, img):
+def x_auth():
     keys = [os.environ.get(k) for k in ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_SECRET")]
     if not all(keys):
-        return "skipped (no X_* keys)"
+        return None
     from requests_oauthlib import OAuth1
-    auth = OAuth1(*keys)
+    return OAuth1(*keys)
+
+
+def x_whoami():
+    """Which account do the X tokens belong to? Refuse to post if it isn't config.json's "twitter" handle."""
+    auth = x_auth()
+    if auth is None:
+        return None
+    r = requests.get("https://api.x.com/2/users/me", auth=auth, timeout=30)
+    if not r.ok:
+        raise RuntimeError(f"X {r.status_code}: {r.text[:300]}")
+    return r.json()["data"]["username"]
+
+
+def post_x(text, img):
+    auth = x_auth()
+    if auth is None:
+        return "skipped (no X_* keys)"
+    want = (CONFIG.get("twitter") or "").lstrip("@").lower()
+    who = x_whoami()
+    if want and who.lower() != want:
+        raise RuntimeError(f"X tokens belong to @{who}, not @{want}; refusing to post")
     media_id = None
     r = requests.post("https://api.x.com/2/media/upload", auth=auth, timeout=60,
                       files={"media": ("og.png", img.read_bytes(), "image/png")}, data={"media_category": "tweet_image"})
@@ -326,6 +347,7 @@ def main():
     ap.add_argument("--nostr-profile", action="store_true")
     ap.add_argument("--nostr-keygen", metavar="FILE")
     ap.add_argument("--test-alert", action="store_true", help="email a sample milestone draft (checks the Gmail setup)")
+    ap.add_argument("--only", choices=["bluesky", "nostr", "x"], help="post to just this platform (with --force for a test post)")
     a = ap.parse_args()
     if a.nostr_keygen:
         return nostr_keygen(a.nostr_keygen)
@@ -360,6 +382,8 @@ def main():
     img = SITE / "og.png"
     failures, sent = 0, 0
     for name, fn in (("Bluesky", lambda: post_bluesky(text, img, alt)), ("Nostr", lambda: post_nostr(text)), ("X", lambda: post_x(text, img))):
+        if a.only and name.lower() != a.only:
+            continue
         try:
             res = fn()
             print(f"{name}: {res}")

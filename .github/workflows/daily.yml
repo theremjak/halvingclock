@@ -13,6 +13,10 @@ on:
         description: "Email a sample milestone alert (checks the Gmail setup)"
         type: boolean
         default: false
+      test_x:
+        description: "Post today's update to X only (checks the X keys; refuses unless they belong to @halvingclock)"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy
@@ -51,6 +55,14 @@ jobs:
           ALERT_SMTP_USER: ${{ secrets.ALERT_SMTP_USER }}           # milestone drafts are emailed, not posted
           ALERT_SMTP_APP_PASSWORD: ${{ secrets.ALERT_SMTP_APP_PASSWORD }}
         run: python social.py --prev prev_state.json
+      - name: Test X post
+        if: inputs.test_x
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+        run: python social.py --prev prev_state.json --only x --force
       - name: Test milestone email
         if: inputs.test_alert
         env:
