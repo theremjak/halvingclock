@@ -293,7 +293,7 @@ def nostr_keygen(out):
 # ───────────────────────── X ─────────────────────────
 
 def x_auth():
-    keys = [os.environ.get(k) for k in ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_SECRET")]
+    keys = [(os.environ.get(k) or "").strip() for k in ("X_API_KEY", "X_API_SECRET", "X_ACCESS_TOKEN", "X_ACCESS_SECRET")]
     if not all(keys):
         return None
     from requests_oauthlib import OAuth1
