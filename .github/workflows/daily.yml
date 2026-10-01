@@ -9,6 +9,10 @@ on:
         description: "Also send today's social posts (scheduled runs always post)"
         type: boolean
         default: false
+      test_alert:
+        description: "Email a sample milestone alert (checks the Gmail setup)"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy
@@ -16,7 +20,6 @@ concurrency:
 
 permissions:
   contents: read
-  issues: write          # milestone alerts open an issue (GitHub emails the repo owner)
 
 jobs:
   build-deploy:
@@ -45,7 +48,15 @@ jobs:
           X_API_SECRET: ${{ secrets.X_API_SECRET }}
           X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
           X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          ALERT_SMTP_USER: ${{ secrets.ALERT_SMTP_USER }}           # milestone drafts are emailed, not posted
+          ALERT_SMTP_APP_PASSWORD: ${{ secrets.ALERT_SMTP_APP_PASSWORD }}
         run: python social.py --prev prev_state.json
+      - name: Test milestone email
+        if: inputs.test_alert
+        env:
+          ALERT_SMTP_USER: ${{ secrets.ALERT_SMTP_USER }}
+          ALERT_SMTP_APP_PASSWORD: ${{ secrets.ALERT_SMTP_APP_PASSWORD }}
+        run: python social.py --test-alert
       - name: Deploy to Cloudflare (Worker serving ./site)
         uses: cloudflare/wrangler-action@v3
         with:
@@ -53,11 +64,6 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.143.0"   # the action's default is older and can't deploy an assets-only Worker
           command: deploy
-      - name: Milestone alert (GitHub issue with a ready-to-paste Reddit draft)
-        if: steps.social.outcome != 'skipped' && hashFiles('milestone_body.md') != ''
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh issue create --repo "${{ github.repository }}" --title "$(cat milestone_title.txt)" --body-file milestone_body.md --label milestone
       - name: Report social-post failure (after the site is deployed)
         if: steps.social.outcome == 'failure'
         run: echo "::error::One or more social posts failed; see the Social posts step log." && exit 1

@@ -49,6 +49,6 @@ r/BitcoinMarkets is strict about links outside the daily thread. Post this as a 
 
 ## Later: milestone posts
 
-The daily job opens a GitHub issue with a ready-to-paste draft whenever a notable milestone happens (new cycle low, leaving the
+The daily job emails you a ready-to-paste draft whenever a notable milestone happens (new cycle low, leaving the
 historical low window, 365 days to the halving, and so on). Those make good r/BitcoinMarkets daily-thread comments, and
 occasionally a r/Bitcoin discussion post. Aim for at most one Reddit post a month so the account doesn't read as promotional.

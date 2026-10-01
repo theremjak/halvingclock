@@ -123,8 +123,23 @@ def reddit_draft(ms, s):
             + f"**Title:** Day {s['day']} of the cycle: {short[0].lower() + short[1:]}\n\n"
             + "Reuse the comment above as the body, check the sidebar rules first, and keep it to about one standalone post a month.\n\n"
             + "_Close this issue once posted (or if you skip it)._")
-    (HERE / "milestone_title.txt").write_text(title)
-    (HERE / "milestone_body.md").write_text(body)
+    return title, body
+
+
+def email_alert(title, body):
+    """Email the draft via Gmail SMTP (ALERT_SMTP_USER + ALERT_SMTP_APP_PASSWORD; ALERT_TO defaults to the sender)."""
+    import smtplib
+    from email.message import EmailMessage
+    user, pw = os.environ.get("ALERT_SMTP_USER"), os.environ.get("ALERT_SMTP_APP_PASSWORD")
+    if not (user and pw):
+        return "skipped (no ALERT_SMTP_USER / ALERT_SMTP_APP_PASSWORD)"
+    msg = EmailMessage()
+    msg["Subject"], msg["From"], msg["To"] = title, f"Halving Clock <{user}>", os.environ.get("ALERT_TO") or user
+    msg.set_content(body.replace("```", ""))
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as smtp:
+        smtp.login(user, pw.replace(" ", ""))
+        smtp.send_message(msg)
+    return f"emailed {msg['To']}"
 
 
 # ───────────────────────── Bluesky ─────────────────────────
@@ -310,11 +325,16 @@ def main():
     ap.add_argument("--force", action="store_true", help="post even if yesterday's state has today's date")
     ap.add_argument("--nostr-profile", action="store_true")
     ap.add_argument("--nostr-keygen", metavar="FILE")
+    ap.add_argument("--test-alert", action="store_true", help="email a sample milestone draft (checks the Gmail setup)")
     a = ap.parse_args()
     if a.nostr_keygen:
         return nostr_keygen(a.nostr_keygen)
     if a.nostr_profile:
         return nostr_profile()
+    if a.test_alert:
+        st = json.loads((SITE / "state.json").read_text())
+        t, b = reddit_draft([f"🧪 Test alert: this is what a milestone email looks like (day {st['day']})."], st)
+        return print("Test alert:", email_alert("[TEST] " + t, b))
     s = json.loads((SITE / "state.json").read_text())
     prev = None
     if a.prev and Path(a.prev).exists():
@@ -327,8 +347,13 @@ def main():
         return
     base = (prev or {}).get("posted_state") or prev   # compare with the numbers at the LAST POST, not the last rebuild
     text, alt, is_milestone = compose(base, s)
-    if is_milestone:
-        reddit_draft(milestones(base, s), s)
+    if is_milestone and not a.dry_run:
+        try:
+            print("Milestone alert:", email_alert(*reddit_draft(milestones(base, s), s)))
+        except Exception as e:
+            print(f"Milestone alert: FAILED {e}")
+    elif is_milestone:
+        print("(dry run) milestone alert would be emailed:\n" + reddit_draft(milestones(base, s), s)[1][:600])
     print(("MILESTONE " if is_milestone else "DAILY ") + f"post ({len(text)} chars):\n{text}\n")
     if a.dry_run:
         return
