@@ -179,7 +179,7 @@ def analyse(px, hr, rw, blocks, diffadj):
         hashprice=dict(d=[iso(x) for x in hp.resample("W").last().dropna().index], v=[float(f"{v:.5g}") for v in hp.resample("W").last().dropna().values]),
         hp_year={str(int(k)): float(v) for k, v in hp_year.items() if k >= 2014},
         years={str(int(y)): float(v) for y, v in years.items()},
-        config={k: CONFIG.get(k) for k in ("site_url", "kofi", "lightning", "twitter", "nostr")},
+        config={k: CONFIG.get(k) for k in ("site_url", "kofi", "lightning", "twitter", "nostr", "bluesky_handle", "nostr_npub")},
     )
 
 
