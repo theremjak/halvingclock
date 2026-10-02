@@ -128,7 +128,7 @@ html { scroll-behavior: smooth; }
 .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--rule); }
 .ln { font: 500 13px var(--mono); color: var(--muted); word-break: break-all; }
 .site-foot { font-size: 13px; color: var(--muted); display: grid; gap: 6px; max-width: 90ch; }
-.follow { border-top: 1px solid var(--rule); padding-top: 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.follow { border-block: 1px solid var(--rule); padding-block: 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
 .follow h2 { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); margin-right: 4px; }
 .follow a { display: inline-flex; align-items: center; gap: 8px; font: 600 14px var(--sans); color: var(--ink); text-decoration: none;
   border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 7px 14px 7px 11px; }
@@ -207,6 +207,10 @@ html { scroll-behavior: smooth; }
     <div class="row" id="donate-row"></div>
   </section>
 
+  <section class="follow" id="follow" aria-labelledby="follow-h" hidden>
+    <h2 id="follow-h">Follow us on</h2>
+  </section>
+
   <footer class="site-foot">
     <div><b>Data.</b> Block heights, exact halving times, hash rate, difficulty and miner rewards from <a href="https://mempool.space">mempool.space</a>;
       daily BTC/USD closes from <a href="https://www.bitstamp.net">Bitstamp</a> (from Aug 2011; earlier weekly prices from mempool.space). The next halving
@@ -217,10 +221,6 @@ html { scroll-behavior: smooth; }
       (March 2024, after the US spot ETFs launched), a peak only about 2× the halving price, and a shallower fall so far. The projections show where the old rhythm would
       put things, not a forecast.</div>
   </footer>
-
-  <section class="follow" id="follow" aria-labelledby="follow-h" hidden>
-    <h2 id="follow-h">Follow us on</h2>
-  </section>
 </div>
 
 <script id="data" type="application/json">/*DATA*/</script>
