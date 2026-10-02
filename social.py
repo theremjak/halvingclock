@@ -34,6 +34,13 @@ LINK = URL.replace("https://", "")
 RELAYS = ["wss://relay.damus.io", "wss://nos.lol", "wss://relay.primal.net", "wss://relay.nostr.band", "wss://relay.snort.social",
           "wss://nostr.mom", "wss://offchain.pub", "wss://purplepag.es"]   # nostr.wine dropped: paid relay, refuses writes
 ORD = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 5: "5th", 6: "6th"}
+# Per-platform tags: X favours the $BTC cashtag + one hashtag (tag-stuffing reads as spam and lowers engagement);
+# Bluesky topic feeds pick posts up by hashtag; #bitcoin is one of Nostr's busiest tags.
+TAGS = {"x": "$BTC #Bitcoin", "bluesky": "#Bitcoin", "nostr": "#bitcoin #halving"}
+
+
+def tagged(text, platform):
+    return f"{text}\n{TAGS[platform]}" if TAGS.get(platform) else text
 
 
 # ───────────────────────── composing ─────────────────────────
@@ -162,9 +169,16 @@ def post_bluesky(text, img, alt):
               "langs": ["en"],
               "embed": {"$type": "app.bsky.embed.images", "images": [{"alt": alt[:1000], "image": blob.json()["blob"],
                                                                      "aspectRatio": {"width": 1200, "height": 630}}]}}
+    facets = []
     if i >= 0:
-        record["facets"] = [{"index": {"byteStart": i, "byteEnd": i + len(LINK.encode("utf-8"))},
-                             "features": [{"$type": "app.bsky.richtext.facet#link", "uri": URL + "/"}]}]
+        facets.append({"index": {"byteStart": i, "byteEnd": i + len(LINK.encode("utf-8"))},
+                       "features": [{"$type": "app.bsky.richtext.facet#link", "uri": URL + "/"}]})
+    import re
+    for m in re.finditer(rb"(?<![\w#])#([A-Za-z][A-Za-z0-9_]{0,63})", b):     # hashtags only count on Bluesky as tag facets
+        facets.append({"index": {"byteStart": m.start(), "byteEnd": m.end()},
+                       "features": [{"$type": "app.bsky.richtext.facet#tag", "tag": m.group(1).decode()}]})
+    if facets:
+        record["facets"] = facets
     r = requests.post(f"{pds}/com.atproto.repo.createRecord", headers=auth, timeout=30,
                       json={"repo": sess["did"], "collection": "app.bsky.feed.post", "record": record})
     r.raise_for_status()
@@ -396,12 +410,16 @@ def main():
             print(f"Milestone alert: FAILED {e}")
     elif is_milestone:
         print("(dry run) milestone alert would be emailed:\n" + reddit_draft(milestones(base, s), s)[1][:600])
-    print(("MILESTONE " if is_milestone else "DAILY ") + f"post ({len(text)} chars):\n{text}\n")
+    x_len = len(tagged(text, "x")) - len(LINK) + 23            # X counts every link as 23 characters
+    if x_len > 280:
+        raise SystemExit(f"X post would be {x_len} characters (limit 280); shorten the template")
+    print(("MILESTONE " if is_milestone else "DAILY ") + f"post ({len(text)} chars; X {x_len}/280 with tags):\n{tagged(text, 'x')}\n")
     if a.dry_run:
         return
     img = SITE / "og.png"
     failures, sent = 0, 0
-    for name, fn in (("Bluesky", lambda: post_bluesky(text, img, alt)), ("Nostr", lambda: post_nostr(text)), ("X", lambda: post_x(text, img))):
+    for name, fn in (("Bluesky", lambda: post_bluesky(tagged(text, "bluesky"), img, alt)), ("Nostr", lambda: post_nostr(tagged(text, "nostr"))),
+                     ("X", lambda: post_x(tagged(text, "x"), img))):
         if a.only and name.lower() != a.only:
             continue
         try:
