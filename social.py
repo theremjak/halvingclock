@@ -90,18 +90,50 @@ def daily_line(s):
     return where
 
 
+QUESTIONS = [
+    "Does the four-year cycle still hold after the ETFs?",
+    "Is the cycle low already in, or is there another leg down?",
+    "Will this cycle's drawdown stay shallower than the last three?",
+    "What breaks the four-year rhythm first: ETFs, rates, or something else?",
+    "Is the halving still the clock, or has the market outgrown it?",
+]
+
+
 def compose(prev, s):
+    """One post: a milestone headline when something notable happened, otherwise a daily post whose opening line
+    rotates (so the feed doesn't read as the same bot post every day), with a discussion question every third day."""
     ms = milestones(prev, s)
-    stats = (f"{s['remaining']:,} blocks (~{s['days_to_halving']} days) to the next halving\n"
-             f"BTC {fmt_usd(s['price'])} · {s['dd'] * 100:+.0f}% from the cycle peak")
+    blocks = f"{s['remaining']:,} blocks (~{s['days_to_halving']} days) to the next halving"
+    price = f"BTC {fmt_usd(s['price'])} · {s['dd'] * 100:+.0f}% from the cycle peak"
+    where = daily_line(s)
     if ms:
-        text = f"{ms[0]}\n\n{stats}\n{LINK}"
+        text = f"{ms[0]}\n\n{blocks}\n{price}\n{LINK}"
     else:
-        text = (f"⏳ Day {s['day']} of Bitcoin's {ORD.get(s['cycle'], str(s['cycle']))} halving cycle\n"
-                f"{stats}\n{daily_line(s)}\n{LINK}")
+        ordc = ORD.get(s["cycle"], str(s["cycle"]))
+        k = s["day"] % 5
+        if k == 0:
+            lines = [f"⏳ Day {s['day']} of Bitcoin's {ordc} halving cycle", blocks, price, where]
+        elif k == 1:
+            lines = [f"🕰️ {s['days_to_halving']} days until Bitcoin's next halving ({s['remaining']:,} blocks)",
+                     f"Day {s['day']} of cycle {s['cycle']}", price, where]
+        elif k == 2:
+            lines = [where.replace("📍 ", f"📍 Day {s['day']}: "), blocks, price]
+        elif k == 3:
+            lines = [f"📉 BTC is {s['dd'] * 100:+.0f}% from this cycle's {fmt_usd(s['peak'])} peak",
+                     f"Day {s['day']} of Bitcoin's {ordc} halving cycle · {fmt_usd(s['price'])}", blocks, where]
+        else:
+            lines = [f"🧭 Where are we in Bitcoin's four-year cycle? Day {s['day']}", blocks, price, where]
+        if s["day"] % 3 == 0:
+            lines.append(QUESTIONS[(s["day"] // 3) % len(QUESTIONS)])
+        text = "\n".join(lines) + f"\n{LINK}"
     alt = (f"The Halving Clock: day {s['day']} of cycle {s['cycle']}. A timeline of the cycle with the windows where past cycles peaked "
            f"and bottomed, today's position marked, and BTC {fmt_usd(s['price'])}, {s['dd'] * 100:+.0f}% from the cycle peak.")
     return text, alt, bool(ms)
+
+
+def without_link(text):
+    """X variant: the link moves to a self-reply (X shows posts with outside links to fewer people)."""
+    return "\n".join(l for l in text.split("\n") if l.strip() != LINK)
 
 
 # ───────────────────────── milestone → Reddit draft (opened as a GitHub issue by the workflow) ─────────────────────────
@@ -365,7 +397,11 @@ def post_x(text, img):
     r = _x("POST", "https://api.x.com/2/tweets", kind, auth, json=body)
     if not r.ok:
         raise RuntimeError(f"X {r.status_code}: {r.text[:300]}")
-    return f"posted https://x.com/{who}/status/{r.json()['data']['id']}{media_note}"
+    pid = r.json()["data"]["id"]
+    rr = _x("POST", "https://api.x.com/2/tweets", kind, auth,
+            json={"text": f"Full chart, updated daily: {URL}", "reply": {"in_reply_to_tweet_id": pid}})
+    reply_note = "" if rr.ok else f" (link reply failed: {rr.status_code} {rr.text[:120]})"
+    return f"posted https://x.com/{who}/status/{pid}{media_note}{reply_note}"
 
 
 # ───────────────────────── main ─────────────────────────
@@ -410,16 +446,20 @@ def main():
             print(f"Milestone alert: FAILED {e}")
     elif is_milestone:
         print("(dry run) milestone alert would be emailed:\n" + reddit_draft(milestones(base, s), s)[1][:600])
-    x_len = len(tagged(text, "x")) - len(LINK) + 23            # X counts every link as 23 characters
-    if x_len > 280:
-        raise SystemExit(f"X post would be {x_len} characters (limit 280); shorten the template")
-    print(("MILESTONE " if is_milestone else "DAILY ") + f"post ({len(text)} chars; X {x_len}/280 with tags):\n{tagged(text, 'x')}\n")
+    x_text = tagged(without_link(text), "x")
+    if len(x_text) > 280:                             # drop the discussion question first; never skip a day over length
+        text = "\n".join(l for l in text.split("\n") if l not in QUESTIONS)
+        x_text = tagged(without_link(text), "x")
+    if len(x_text) > 280:
+        raise SystemExit(f"X post would be {len(x_text)} characters (limit 280); shorten the template")
+    print(("MILESTONE " if is_milestone else "DAILY ") + f"post — Bluesky/Nostr ({len(text)} chars):\n{text}\n"
+          f"X ({len(x_text)}/280, link goes in a self-reply):\n{x_text}\n")
     if a.dry_run:
         return
     img = SITE / "og.png"
     failures, sent = 0, 0
     for name, fn in (("Bluesky", lambda: post_bluesky(tagged(text, "bluesky"), img, alt)), ("Nostr", lambda: post_nostr(tagged(text, "nostr"))),
-                     ("X", lambda: post_x(tagged(text, "x"), img))):
+                     ("X", lambda: post_x(tagged(without_link(text), "x"), img))):
         if a.only and name.lower() != a.only:
             continue
         try:

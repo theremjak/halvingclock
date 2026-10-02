@@ -2,7 +2,8 @@ name: Daily rebuild
 
 on:
   schedule:
-    - cron: "15 6 * * *"      # 06:15 UTC every day (after Bitstamp's daily candle closes at 00:00 UTC)
+    - cron: "15 6 * * *"      # 06:15 UTC: overnight rebuild with the closed daily candle (no posting)
+    - cron: "30 12 * * *"     # 12:30 UTC = 8:30am US Eastern (7:30 after Nov DST): rebuild + social posts
   workflow_dispatch:
     inputs:
       post:
@@ -43,7 +44,7 @@ jobs:
         run: python build.py
       - name: Social posts (Bluesky, Nostr, X; each skipped until its secrets exist). Runs before deploy so the posted marker ships with the site
         id: social
-        if: github.event_name == 'schedule' || inputs.post
+        if: (github.event_name == 'schedule' && github.event.schedule == '30 12 * * *') || inputs.post
         continue-on-error: true         # a platform outage must not stop the site update
         env:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
