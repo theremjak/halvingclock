@@ -16,6 +16,10 @@ on:
         description: "Email a sample milestone alert (checks the Gmail setup)"
         type: boolean
         default: false
+      bluesky_profile:
+        description: "Set the Bluesky bio from social.py (cross-links X and Nostr)"
+        type: boolean
+        default: false
       test_x:
         description: "Post today's update to X only (checks the X keys; refuses unless they belong to @halvingclock)"
         type: boolean
@@ -75,6 +79,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}  # rotating X refresh token lives in Workers KV
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: python social.py --x-diagnose && python social.py --prev prev_state.json --only x --force
+      - name: Set Bluesky bio
+        if: inputs.bluesky_profile
+        env:
+          BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
+          BSKY_APP_PASSWORD: ${{ secrets.BSKY_APP_PASSWORD }}
+        run: python social.py --bluesky-profile
       - name: Test milestone email
         if: inputs.test_alert
         env:

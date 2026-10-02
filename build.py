@@ -244,8 +244,15 @@ def build(d):
     if CONFIG.get("cf_analytics_token"):
         analytics = (f"<script defer src='https://static.cloudflareinsights.com/beacon.min.js' "
                      f"data-cf-beacon='{{\"token\": \"{CONFIG['cf_analytics_token']}\"}}'></script>")
+    profiles = [u for k, u in (("twitter", "https://x.com/{}"), ("bluesky_handle", "https://bsky.app/profile/{}"),
+                               ("nostr_npub", "https://njump.me/{}")) for u in ([u.format(CONFIG[k])] if CONFIG.get(k) else [])]
+    social_head = "\n".join([f'<link rel="me" href="{p}">' for p in profiles] + [
+        '<script type="application/ld+json">' + json.dumps({"@context": "https://schema.org", "@type": "WebSite",
+                                                            "name": "The Halving Clock", "url": url + "/", "sameAs": profiles}) + "</script>"])
+    if CONFIG.get("twitter"):
+        social_head += f'\n<meta name="twitter:site" content="@{CONFIG["twitter"]}">'
     html = (tpl.replace("/*DATA*/", blob).replace("{{DESC}}", desc).replace("{{URL}}", url)
-               .replace("{{BUILT}}", d["built"]).replace("{{ANALYTICS}}", analytics))
+               .replace("{{BUILT}}", d["built"]).replace("{{ANALYTICS}}", analytics).replace("{{SOCIAL_HEAD}}", social_head))
     (SITE / "index.html").write_text(html)
     og_image(d, SITE / "og.png")
     (SITE / "favicon.svg").write_text(

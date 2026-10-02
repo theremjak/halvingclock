@@ -12,6 +12,8 @@ Usage:
   python social.py --prev prev_state.json            post (skips if yesterday's state has the same date)
   python social.py --prev prev_state.json --dry-run  print the post, send nothing
   python social.py --nostr-profile                   publish/refresh the Nostr profile (name, picture, NIP-05, Lightning)
+  python social.py --bluesky-profile                 set the Bluesky bio (needs BSKY_HANDLE / BSKY_APP_PASSWORD; workflow input)
+  python social.py --x-bio                           print the X bio to paste by hand
   python social.py --nostr-keygen                    generate a new Nostr key pair (prints npub; nsec goes to a file)
 """
 import argparse
@@ -37,6 +39,15 @@ ORD = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 5: "5th", 6: "6th"}
 # Per-platform tags: X favours the $BTC cashtag + one hashtag (tag-stuffing reads as spam and lowers engagement);
 # Bluesky topic feeds pick posts up by hashtag; #bitcoin is one of Nostr's busiest tags.
 TAGS = {"x": "$BTC #Bitcoin", "bluesky": "#Bitcoin", "nostr": "#bitcoin #halving"}
+# Profile bios cross-link the other accounts (handles, not URLs: every client turns its own handle syntax into a link)
+ELSEWHERE = {"x": f"X @{CONFIG.get('twitter')}" if CONFIG.get("twitter") else None,
+             "bluesky": f"Bluesky @{CONFIG.get('bluesky_handle')}" if CONFIG.get("bluesky_handle") else None,
+             "nostr": f"Nostr {LINK.split('.')[0]}@{LINK}" if CONFIG.get("nostr_npub") else None}   # NIP-05 id, searchable in Nostr apps
+
+
+def bio(platform, base):
+    others = [v for k, v in ELSEWHERE.items() if k != platform and v]
+    return base + ("\n\nAlso on " + " · ".join(others) if others else "")
 
 
 def tagged(text, platform):
@@ -217,6 +228,30 @@ def post_bluesky(text, img, alt):
     return f"posted {r.json()['uri']}"
 
 
+
+def bluesky_profile():
+    """Set the Bluesky bio (read-modify-write, so the avatar, banner and display name are kept)."""
+    h, pw = os.environ.get("BSKY_HANDLE"), os.environ.get("BSKY_APP_PASSWORD")
+    if not (h and pw):
+        sys.exit("BSKY_HANDLE / BSKY_APP_PASSWORD not set")
+    pds = "https://bsky.social/xrpc"
+    sess = requests.post(f"{pds}/com.atproto.server.createSession", json={"identifier": h, "password": pw}, timeout=30)
+    sess.raise_for_status()
+    sess = sess.json()
+    auth = {"Authorization": f"Bearer {sess['accessJwt']}"}
+    cur = requests.get(f"{pds}/com.atproto.repo.getRecord", headers=auth, timeout=30,
+                       params={"repo": sess["did"], "collection": "app.bsky.actor.profile", "rkey": "self"})
+    rec, swap = (cur.json()["value"], cur.json().get("cid")) if cur.ok else ({"$type": "app.bsky.actor.profile"}, None)
+    rec["description"] = bio("bluesky", f"Where Bitcoin sits in its halving cycle, updated daily, with a live countdown to the next "
+                                        f"halving. Free and ad-free: {LINK}")
+    assert len(rec["description"]) <= 256, len(rec["description"])
+    body = {"repo": sess["did"], "collection": "app.bsky.actor.profile", "rkey": "self", "record": rec}
+    if swap:
+        body["swapRecord"] = swap
+    r = requests.post(f"{pds}/com.atproto.repo.putRecord", headers=auth, json=body, timeout=30)
+    r.raise_for_status()
+    print("Bluesky bio set:\n" + rec["description"])
+
 # ───────────────────────── Nostr ─────────────────────────
 
 CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
@@ -314,8 +349,8 @@ def post_nostr(text):
 
 def nostr_profile():
     meta = {"name": "halvingclock", "display_name": "The Halving Clock", "website": URL,
-            "about": "Where Bitcoin sits in its halving cycle, updated daily: day count, past cycle peaks and lows, and a live "
-                     f"countdown to the next halving. Free and ad-free at {LINK}. Not financial advice.",
+            "about": bio("nostr", "Where Bitcoin sits in its halving cycle, updated daily: day count, past cycle peaks and lows, and a live "
+                                  f"countdown to the next halving. Free and ad-free at {LINK}. Not financial advice."),
             "picture": f"{URL}/brand/avatar-400.png", "nip05": f"halvingclock@{LINK}"}
     if CONFIG.get("lightning"):
         meta["lud16"] = CONFIG["lightning"]
@@ -412,6 +447,8 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true", help="post even if yesterday's state has today's date")
     ap.add_argument("--nostr-profile", action="store_true")
+    ap.add_argument("--bluesky-profile", action="store_true", help="set the Bluesky bio (cross-links the other accounts)")
+    ap.add_argument("--x-bio", action="store_true", help="print the X bio to paste (X's API can't edit profiles with OAuth 2.0)")
     ap.add_argument("--nostr-keygen", metavar="FILE")
     ap.add_argument("--test-alert", action="store_true", help="email a sample milestone draft (checks the Gmail setup)")
     ap.add_argument("--x-diagnose", action="store_true")
@@ -421,6 +458,10 @@ def main():
         return nostr_keygen(a.nostr_keygen)
     if a.nostr_profile:
         return nostr_profile()
+    if a.bluesky_profile:
+        return bluesky_profile()
+    if a.x_bio:
+        return print(bio("x", "Where Bitcoin sits in its halving cycle, updated daily."))
     if a.x_diagnose:
         return x_diagnose()
     if a.test_alert:
