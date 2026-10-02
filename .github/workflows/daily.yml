@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "15 6 * * *"      # 06:15 UTC: overnight rebuild with the closed daily candle (no posting)
     - cron: "30 12 * * *"     # 12:30 UTC = 8:30am US Eastern (7:30 after Nov DST): rebuild + social posts
+    - cron: "45 15 * * *"     # backstops: GitHub delays scheduled runs by hours and sometimes drops them outright
+    - cron: "45 19 * * *"     #   (2026-10-02: the 06:15 run started 12:26, the 12:30 run never came). posted_for makes repeats no-ops
   workflow_dispatch:
     inputs:
       post:
@@ -39,12 +41,16 @@ jobs:
           cache: pip
       - run: pip install -r requirements.txt
       - name: Save yesterday's state (for milestone detection and the once-a-day guard)
-        run: curl -fsS https://halvingclock.com/state.json -o prev_state.json || echo '{}' > prev_state.json
+        run: curl -fsS "https://halvingclock.com/state.json?v=$GITHUB_RUN_ID" -o prev_state.json || echo '{}' > prev_state.json   # cache-buster: edge may serve the pre-deploy copy
       - name: Build (fetch mempool.space + Bitstamp, regenerate site/)
         run: python build.py
+      - name: Posting window? (any scheduled run that actually starts at/after 12:00 UTC; a late 06:15 run counts)
+        id: when
+        if: github.event_name == 'schedule'
+        run: echo "post=$([ "$(date -u +%-H)" -ge 12 ] && echo true || echo false)" | tee -a "$GITHUB_OUTPUT"
       - name: Social posts (Bluesky, Nostr, X; each skipped until its secrets exist). Runs before deploy so the posted marker ships with the site
         id: social
-        if: (github.event_name == 'schedule' && github.event.schedule == '30 12 * * *') || inputs.post
+        if: steps.when.outputs.post == 'true' || inputs.post
         continue-on-error: true         # a platform outage must not stop the site update
         env:
           BSKY_HANDLE: ${{ secrets.BSKY_HANDLE }}
