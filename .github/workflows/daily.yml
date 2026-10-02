@@ -17,7 +17,7 @@ on:
         type: boolean
         default: false
       bluesky_profile:
-        description: "Set the Bluesky bio from social.py (cross-links X and Nostr)"
+        description: "Set the Bluesky bio + banner (bio cross-links X and Nostr)"
         type: boolean
         default: false
       test_x:

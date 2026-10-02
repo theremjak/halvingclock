@@ -245,12 +245,18 @@ def bluesky_profile():
     rec["description"] = bio("bluesky", f"Where Bitcoin sits in its halving cycle, updated daily, with a live countdown to the next "
                                         f"halving. Free and ad-free: {LINK}")
     assert len(rec["description"]) <= 256, len(rec["description"])
+    banner = HERE / "brand" / "halvingclock-banner.png"
+    if banner.exists():
+        up = requests.post(f"{pds}/com.atproto.repo.uploadBlob", data=banner.read_bytes(),
+                           headers={**auth, "Content-Type": "image/png"}, timeout=60)
+        up.raise_for_status()
+        rec["banner"] = up.json()["blob"]
     body = {"repo": sess["did"], "collection": "app.bsky.actor.profile", "rkey": "self", "record": rec}
     if swap:
         body["swapRecord"] = swap
     r = requests.post(f"{pds}/com.atproto.repo.putRecord", headers=auth, json=body, timeout=30)
     r.raise_for_status()
-    print("Bluesky bio set:\n" + rec["description"])
+    print("Bluesky bio" + (" + banner" if banner.exists() else "") + " set:\n" + rec["description"])
 
 # ───────────────────────── Nostr ─────────────────────────
 
@@ -351,7 +357,7 @@ def nostr_profile():
     meta = {"name": "halvingclock", "display_name": "The Halving Clock", "website": URL,
             "about": bio("nostr", "Where Bitcoin sits in its halving cycle, updated daily: day count, past cycle peaks and lows, and a live "
                                   f"countdown to the next halving. Free and ad-free at {LINK}. Not financial advice."),
-            "picture": f"{URL}/brand/avatar-400.png", "nip05": f"halvingclock@{LINK}"}
+            "picture": f"{URL}/brand/avatar-400.png", "banner": f"{URL}/brand/banner.png", "nip05": f"halvingclock@{LINK}"}
     if CONFIG.get("lightning"):
         meta["lud16"] = CONFIG["lightning"]
     ev = nostr_event(0, json.dumps(meta, ensure_ascii=False))
@@ -447,7 +453,7 @@ def main():
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--force", action="store_true", help="post even if yesterday's state has today's date")
     ap.add_argument("--nostr-profile", action="store_true")
-    ap.add_argument("--bluesky-profile", action="store_true", help="set the Bluesky bio (cross-links the other accounts)")
+    ap.add_argument("--bluesky-profile", action="store_true", help="set the Bluesky bio + banner (bio cross-links the other accounts)")
     ap.add_argument("--x-bio", action="store_true", help="print the X bio to paste (X's API can't edit profiles with OAuth 2.0)")
     ap.add_argument("--nostr-keygen", metavar="FILE")
     ap.add_argument("--test-alert", action="store_true", help="email a sample milestone draft (checks the Gmail setup)")

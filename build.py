@@ -287,6 +287,8 @@ def build(d):
         src = HERE / "brand" / f"halvingclock-avatar-{size}.png"
         if src.exists():
             (bd / f"avatar-{size}.png").write_bytes(src.read_bytes())
+    if (HERE / "brand" / "halvingclock-banner.png").exists():          # profile banner (Nostr points at this URL)
+        (bd / "banner.png").write_bytes((HERE / "brand" / "halvingclock-banner.png").read_bytes())
     print(f"built site/ · day {day} of cycle {cur['n']} · BTC ${d['price']:,.0f} · next halving ≈ {d['next_halving']} "
           f"({d['remaining']:,} blocks) · index.html {len(html) / 1e3:.0f} KB")
 
