@@ -45,9 +45,18 @@ ELSEWHERE = {"x": f"X @{CONFIG.get('twitter')}" if CONFIG.get("twitter") else No
              "nostr": f"Nostr {LINK.split('.')[0]}@{LINK}" if CONFIG.get("nostr_npub") else None}   # NIP-05 id, searchable in Nostr apps
 
 
-def bio(platform, base):
+# One voice, three lengths (X caps bios at 160 chars, Bluesky at 256 graphemes)
+BIO_HOOK = "Bitcoin runs on a four-year clock. ⏳ We read it every morning"
+BIOS = {"x": f"{BIO_HOOK}. Charts, not calls.",
+        "bluesky": f"{BIO_HOOK}: cycle day, where past cycles peaked and bottomed, and blocks to the next halving. "
+                   f"Charts, not calls. {LINK}",
+        "nostr": f"{BIO_HOOK}: what day of the cycle it is, where the last three cycles peaked and bottomed, and how many "
+                 f"blocks until the next halving. Free, ad-free, updated daily at {LINK}. Charts, not calls (not financial advice)."}
+
+
+def bio(platform):
     others = [v for k, v in ELSEWHERE.items() if k != platform and v]
-    return base + ("\n\nAlso on " + " · ".join(others) if others else "")
+    return BIOS[platform] + ("\n\nAlso on " + " · ".join(others) if others else "")
 
 
 def tagged(text, platform):
@@ -242,8 +251,7 @@ def bluesky_profile():
     cur = requests.get(f"{pds}/com.atproto.repo.getRecord", headers=auth, timeout=30,
                        params={"repo": sess["did"], "collection": "app.bsky.actor.profile", "rkey": "self"})
     rec, swap = (cur.json()["value"], cur.json().get("cid")) if cur.ok else ({"$type": "app.bsky.actor.profile"}, None)
-    rec["description"] = bio("bluesky", f"Where Bitcoin sits in its halving cycle, updated daily, with a live countdown to the next "
-                                        f"halving. Free and ad-free: {LINK}")
+    rec["description"] = bio("bluesky")
     assert len(rec["description"]) <= 256, len(rec["description"])
     banner = HERE / "brand" / "halvingclock-banner.png"
     if banner.exists():
@@ -355,8 +363,7 @@ def post_nostr(text):
 
 def nostr_profile():
     meta = {"name": "halvingclock", "display_name": "The Halving Clock", "website": URL,
-            "about": bio("nostr", "Where Bitcoin sits in its halving cycle, updated daily: day count, past cycle peaks and lows, and a live "
-                                  f"countdown to the next halving. Free and ad-free at {LINK}. Not financial advice."),
+            "about": bio("nostr"),
             "picture": f"{URL}/brand/avatar-400.png", "banner": f"{URL}/brand/banner.png", "nip05": f"halvingclock@{LINK}"}
     if CONFIG.get("lightning"):
         meta["lud16"] = CONFIG["lightning"]
@@ -467,7 +474,7 @@ def main():
     if a.bluesky_profile:
         return bluesky_profile()
     if a.x_bio:
-        return print(bio("x", "Where Bitcoin sits in its halving cycle, updated daily."))
+        return print(bio("x"))
     if a.x_diagnose:
         return x_diagnose()
     if a.test_alert:
